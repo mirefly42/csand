@@ -1,6 +1,7 @@
 .POSIX:
 
-SRC = csand.c
+SRC = csand.c platform_glfw.c
+HDR = platform.h
 OBJ = ${SRC:.c=.o}
 LIBS = -lglfw -lepoxy
 
@@ -11,6 +12,8 @@ csand: ${OBJ}
 
 .c.o:
 	${CC} -c -o $@ $< ${CFLAGS}
+
+${OBJ}: ${HDR}
 
 validate:
 	glslangValidator shader.vert shader.frag
