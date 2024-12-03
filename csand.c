@@ -1,6 +1,6 @@
 #include "platform.h"
 #include <stdbool.h>
-#include <stdlib.h>
+#include <stdint.h>
 
 #define SPEED_LIMIT 128
 
@@ -26,6 +26,7 @@ static void csandInputCallback(CsandInput input);
 static void csandRenderCallback(unsigned char *data, unsigned short width, unsigned short height);
 static void csandSimulate(CsandRenderBuffer buf);
 static inline unsigned char *csandGetMat(CsandRenderBuffer buf, unsigned int x, unsigned int y);
+static uint32_t csandRand(void);
 static bool csandInBounds(CsandRenderBuffer buf, int x, int y);
 
 int main(void) {
@@ -84,7 +85,7 @@ static void csandSimulate(CsandRenderBuffer buf) {
                     if (y <= 0) {
                         continue;
                     } else {
-                        int dx = rand() % 3 - 1;
+                        int dx = csandRand() % 3 - 1;
                         if (!csandInBounds(buf, x + dx, y - 1)) continue;
                         unsigned char swap_mat = *csandGetMat(buf, x + dx, y - 1);
 
@@ -95,8 +96,8 @@ static void csandSimulate(CsandRenderBuffer buf) {
                     }
                     break;
                 case MAT_LIQUID: {
-                    int dx = rand() % 3 - 1;
-                    int dy = - (rand() % 2);
+                    int dx = csandRand() % 3 - 1;
+                    int dy = - (csandRand() % 2);
                     if (!csandInBounds(buf, x + dx, y + dy)) continue;
 
                     if (*csandGetMat(buf, x + dx, y + dy) == MAT_AIR) {
@@ -124,6 +125,13 @@ static void csandSimulate(CsandRenderBuffer buf) {
 
 static inline unsigned char *csandGetMat(CsandRenderBuffer buf, unsigned int x, unsigned int y) {
     return buf.data + buf.width * y + x;
+}
+
+static uint32_t csandRand(void)
+{
+    static uint64_t seed = 1;
+    seed = 6364136223846793005*seed + 1;
+    return seed >> 32;
 }
 
 static bool csandInBounds(CsandRenderBuffer buf, int x, int y) {
