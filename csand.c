@@ -109,42 +109,34 @@ static void csandSimulate(CsandRenderBuffer buf) {
         for (unsigned int x = 0; x < buf.width; x++) {
             unsigned char mat = *csandGetMat(buf, x, y);
 
-            if (mat & MAT_UPDATED_BIT) continue;
+            if (mat & MAT_UPDATED_BIT) {
+                continue;
+            }
             CsandMaterialProperties mat_props = materials[mat];
 
-            switch (mat_props.kind) {
-                case MAT_KIND_POWDER:
-                    if (y <= 0) {
-                        continue;
-                    } else {
-                        int dx = csandRand() % 3 - 1;
-                        if (!csandInBounds(buf, x + dx, y - 1)) continue;
-                        unsigned char swap_mat = *csandGetMat(buf, x + dx, y - 1);
-                        if (swap_mat & MAT_UPDATED_BIT) continue;
-                        CsandMaterialProperties swap_mat_props = materials[swap_mat];
+            if (mat_props.kind == MAT_KIND_SOLID) {
+                continue;
+            }
 
-                        if (swap_mat_props.kind != MAT_KIND_SOLID && swap_mat_props.density < mat_props.density) {
-                            *csandGetMat(buf, x, y) = swap_mat;
-                            *csandGetMat(buf, x + dx, y - 1) = mat | MAT_UPDATED_BIT;
-                        }
-                    }
-                    break;
-                case MAT_KIND_FLUID: {
-                    int dx = csandRand() % 3 - 1;
-                    int dy = - (csandRand() % 2);
-                    if (!csandInBounds(buf, x + dx, y + dy)) continue;
-                    unsigned char swap_mat = *csandGetMat(buf, x + dx, y + dy);
-                    if (swap_mat & MAT_UPDATED_BIT) continue;
-                    CsandMaterialProperties swap_mat_props = materials[swap_mat];
+            int dx = csandRand() % 3 - 1;
+            int dy = mat_props.kind == MAT_KIND_POWDER ? -1 : -(csandRand() & 1);
 
-                    if (swap_mat_props.kind != MAT_KIND_SOLID && swap_mat_props.density < mat_props.density) {
-                        *csandGetMat(buf, x, y) = swap_mat;
-                        *csandGetMat(buf, x + dx, y + dy) = mat | MAT_UPDATED_BIT;
-                    }
-                    break;
-                }
-                default:
-                    break;
+            if (!csandInBounds(buf, x + dx, y + dy)) {
+                continue;
+            }
+
+            unsigned int sx = x + dx;
+            unsigned int sy = y + dy;
+            unsigned char swap_mat = *csandGetMat(buf, sx, sy);
+            if (swap_mat & MAT_UPDATED_BIT) {
+                continue;
+            }
+
+            CsandMaterialProperties swap_mat_props = materials[swap_mat];
+
+            if (swap_mat_props.kind != MAT_KIND_SOLID && swap_mat_props.density < mat_props.density) {
+                *csandGetMat(buf, x, y) = swap_mat;
+                *csandGetMat(buf, sx, sy) = mat | MAT_UPDATED_BIT;
             }
         }
     }
