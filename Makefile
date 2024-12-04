@@ -1,7 +1,7 @@
 .POSIX:
 
 SRC = csand.c platform_glfw.c
-HDR = platform.h
+HDR = platform.h rgba.h
 OBJ = ${SRC:.c=.o}
 LIBS = -lglfw -lepoxy
 

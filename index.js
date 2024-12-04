@@ -13,6 +13,7 @@ let buf = null;
 let mouse_down = false;
 let mouse_x = 0;
 let mouse_y = 0;
+let program = null;
 
 async function main() {
     vertex_src = await (await fetch("shader.vert")).text();
@@ -21,6 +22,7 @@ async function main() {
     const import_object = {
         env: {
             csandPlatformInit: csandPlatformInit,
+            csandPlatformSetPalette: csandPlatformSetPalette,
             csandPlatformSetInputCallback: (callback_index) => {
                 input_callback = function_table.get(callback_index);
                 document.addEventListener("keydown", (event) => {
@@ -76,7 +78,7 @@ function csandPlatformInit() {
     ]);
     gl.bufferData(gl.ARRAY_BUFFER, vbo_data, gl.STATIC_DRAW);
 
-    const program = csandLoadShaderProgram();
+    program = csandLoadShaderProgram();
     gl.useProgram(program);
 
     const position_attr_loc = gl.getAttribLocation(program, "position");
@@ -84,6 +86,7 @@ function csandPlatformInit() {
     gl.enableVertexAttribArray(position_attr_loc);
 
     const texture = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
 
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -139,6 +142,24 @@ function csandLoadShader(src, type) {
     }
 
     return shader;
+}
+
+function csandPlatformSetPalette(colors_ptr, colors_count) {
+    const palette = gl.createTexture();
+
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, palette);
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    const colors = new Uint8Array(obj.instance.exports.memory.buffer, colors_ptr, colors_count * 4);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, colors_count, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, colors);
+
+    gl.uniform1i(gl.getUniformLocation(program, "palette"), 1);
+    gl.uniform1i(gl.getUniformLocation(program, "palette_size"), colors_count);
+
+    gl.activeTexture(gl.TEXTURE0);
 }
 
 function csandPlatformRun() {

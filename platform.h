@@ -1,6 +1,10 @@
 #ifndef CSAND_PLATFORM_H
 #define CSAND_PLATFORM_H
 
+#include "rgba.h"
+#include <stddef.h>
+#include <stdint.h>
+
 typedef enum {
     CSAND_INPUT_SELECT_MAT0,
     CSAND_INPUT_SELECT_MAT1,
@@ -20,6 +24,7 @@ typedef void (*CsandRenderCallback)(unsigned char *data, unsigned short width, u
 typedef void (*CsandInputCallback)(CsandInput input);
 
 void csandPlatformInit(void);
+void csandPlatformSetPalette(const CsandRgba *colors, uint8_t colors_count);
 void csandPlatformSetRenderCallback(CsandRenderCallback callback);
 void csandPlatformSetInputCallback(CsandInputCallback callback);
 unsigned int csandPlatformIsMouseButtonPressed(CsandMouseButton button);

@@ -15,6 +15,7 @@
 
 static GLFWwindow *window;
 static GLuint texture = 0;
+static GLuint program = 0;
 
 static void csandGlfwErrorCallback(int code, const char *msg);
 static void csandGlfwKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
@@ -49,7 +50,7 @@ void csandPlatformInit(void) {
     };
     glBufferData(GL_ARRAY_BUFFER, sizeof(vbo_data), vbo_data, GL_STATIC_DRAW);
 
-    GLuint program = csandLoadShaderProgram();
+    program = csandLoadShaderProgram();
     glUseProgram(program);
 
     GLint position_attr_loc = glGetAttribLocation(program, "position");
@@ -58,6 +59,7 @@ void csandPlatformInit(void) {
 
 
     glGenTextures(1, &texture);
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -208,6 +210,23 @@ fail1:
     fclose(file);
 fail0:
     return NULL;
+}
+
+void csandPlatformSetPalette(const CsandRgba *colors, uint8_t colors_count) {
+    GLuint palette;
+    glGenTextures(1, &palette);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, palette);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, colors_count, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, colors);
+
+    glUniform1i(glGetUniformLocation(program, "palette"), 1);
+    glUniform1i(glGetUniformLocation(program, "palette_size"), colors_count);
+
+    glActiveTexture(GL_TEXTURE0);
 }
 
 void csandPlatformSetRenderCallback(CsandRenderCallback callback) {

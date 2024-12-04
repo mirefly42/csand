@@ -1,4 +1,5 @@
 #include "platform.h"
+#include "rgba.h"
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -6,15 +7,42 @@
 
 enum {
     MAT_AIR,
-    MAT_SOLID,
+    MAT_WALL,
     MAT_SAND,
-    MAT_LIQUID,
+    MAT_WATER,
+    MATERIALS_COUNT,
     MAT_UPDATED_BIT = 0x80
 };
 
 static unsigned int pause = 0;
 static unsigned long speed = 1;
 static unsigned char draw_mat = MAT_SAND;
+
+typedef enum {
+    MAT_KIND_SOLID,
+    MAT_KIND_POWDER,
+    MAT_KIND_FLUID,
+} CsandMaterialKind;
+
+typedef struct CsandMaterialProperties {
+    const char *name;
+    uint32_t density;
+    CsandMaterialKind kind;
+} CsandMaterialProperties;
+
+static const CsandMaterialProperties materials[MATERIALS_COUNT] = {
+    [MAT_AIR] = {"air", 1000, MAT_KIND_FLUID},
+    [MAT_WALL] = {"wall", 2500000, MAT_KIND_SOLID},
+    [MAT_SAND] = {"sand", 1500000, MAT_KIND_POWDER},
+    [MAT_WATER] = {"water", 1000000, MAT_KIND_FLUID},
+};
+
+static const CsandRgba palette[MATERIALS_COUNT] = {
+    [MAT_AIR] = {0x00, 0x00, 0x00, 0xFF},
+    [MAT_WALL] = {0xFF, 0x00, 0xFF, 0xFF},
+    [MAT_SAND] = {0xFF, 0xFF, 0x00, 0xFF},
+    [MAT_WATER] = {0x00, 0x00, 0xFF, 0xFF},
+};
 
 typedef struct CsandRenderBuffer {
     unsigned char *data;
@@ -31,6 +59,7 @@ static bool csandInBounds(CsandRenderBuffer buf, int x, int y);
 
 int main(void) {
     csandPlatformInit();
+    csandPlatformSetPalette(palette, MATERIALS_COUNT);
     csandPlatformSetInputCallback(csandInputCallback);
     csandPlatformSetRenderCallback(csandRenderCallback);
     csandPlatformRun();
@@ -42,13 +71,13 @@ static void csandInputCallback(CsandInput input) {
             draw_mat = MAT_AIR;
             break;
         case CSAND_INPUT_SELECT_MAT1:
-            draw_mat = MAT_SOLID;
+            draw_mat = MAT_WALL;
             break;
         case CSAND_INPUT_SELECT_MAT2:
             draw_mat = MAT_SAND;
             break;
         case CSAND_INPUT_SELECT_MAT3:
-            draw_mat = MAT_LIQUID;
+            draw_mat = MAT_WATER;
             break;
         case CSAND_INPUT_PAUSE_TOGGLE:
             pause = !pause;
@@ -80,28 +109,36 @@ static void csandSimulate(CsandRenderBuffer buf) {
         for (unsigned int x = 0; x < buf.width; x++) {
             unsigned char mat = *csandGetMat(buf, x, y);
 
-            switch (mat) {
-                case MAT_SAND:
+            if (mat & MAT_UPDATED_BIT) continue;
+            CsandMaterialProperties mat_props = materials[mat];
+
+            switch (mat_props.kind) {
+                case MAT_KIND_POWDER:
                     if (y <= 0) {
                         continue;
                     } else {
                         int dx = csandRand() % 3 - 1;
                         if (!csandInBounds(buf, x + dx, y - 1)) continue;
                         unsigned char swap_mat = *csandGetMat(buf, x + dx, y - 1);
+                        if (swap_mat & MAT_UPDATED_BIT) continue;
+                        CsandMaterialProperties swap_mat_props = materials[swap_mat];
 
-                        if (swap_mat == MAT_AIR || swap_mat == MAT_LIQUID) {
+                        if (swap_mat_props.kind != MAT_KIND_SOLID && swap_mat_props.density < mat_props.density) {
                             *csandGetMat(buf, x, y) = swap_mat;
                             *csandGetMat(buf, x + dx, y - 1) = mat | MAT_UPDATED_BIT;
                         }
                     }
                     break;
-                case MAT_LIQUID: {
+                case MAT_KIND_FLUID: {
                     int dx = csandRand() % 3 - 1;
                     int dy = - (csandRand() % 2);
                     if (!csandInBounds(buf, x + dx, y + dy)) continue;
+                    unsigned char swap_mat = *csandGetMat(buf, x + dx, y + dy);
+                    if (swap_mat & MAT_UPDATED_BIT) continue;
+                    CsandMaterialProperties swap_mat_props = materials[swap_mat];
 
-                    if (*csandGetMat(buf, x + dx, y + dy) == MAT_AIR) {
-                        *csandGetMat(buf, x, y) = MAT_AIR;
+                    if (swap_mat_props.kind != MAT_KIND_SOLID && swap_mat_props.density < mat_props.density) {
+                        *csandGetMat(buf, x, y) = swap_mat;
                         *csandGetMat(buf, x + dx, y + dy) = mat | MAT_UPDATED_BIT;
                     }
                     break;
