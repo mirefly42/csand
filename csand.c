@@ -54,11 +54,11 @@ static const CsandMaterialProperties materials[MATERIALS_COUNT] = {
     [MAT_FIRE_POWDER]     = {"fire powder",     600000,  MAT_KIND_POWDER, NPROB(0.05),  NPROB(0),    MAT_SMOKE},
     [MAT_FIRE_LIQUID]     = {"fire liquid",     50000,   MAT_KIND_FLUID,  NPROB(0.06),  NPROB(0),    MAT_AIR},
     [MAT_SMOKE]           = {"smoke",           750,     MAT_KIND_FLUID,  NPROB(0.002), NPROB(0),    MAT_AIR},
-    [MAT_WOOD]            = {"wood",            900000,  MAT_KIND_SOLID,  NPROB(0),     NPROB(0.50), MAT_AIR},
-    [MAT_COAL]            = {"coal",            1500000, MAT_KIND_POWDER, NPROB(0),     NPROB(0.45), MAT_AIR},
-    [MAT_OIL]             = {"oil",             750000,  MAT_KIND_FLUID,  NPROB(0),     NPROB(0.4),  MAT_AIR},
+    [MAT_WOOD]            = {"wood",            900000,  MAT_KIND_SOLID,  NPROB(0),     NPROB(0.5),  MAT_AIR},
+    [MAT_COAL]            = {"coal",            1500000, MAT_KIND_POWDER, NPROB(0),     NPROB(0.3),  MAT_AIR},
+    [MAT_OIL]             = {"oil",             750000,  MAT_KIND_FLUID,  NPROB(0),     NPROB(0.25), MAT_AIR},
     [MAT_HYDROGEN_GAS]    = {"hydrogen gas",    100,     MAT_KIND_FLUID,  NPROB(0),     NPROB(1),    MAT_AIR},
-    [MAT_HYDROGEN_LIQUID] = {"hydrogen liquid", 70800,   MAT_KIND_FLUID,  3,            NPROB(0.25), MAT_HYDROGEN_GAS},
+    [MAT_HYDROGEN_LIQUID] = {"hydrogen liquid", 70800,   MAT_KIND_FLUID,  3,            NPROB(0.1),  MAT_HYDROGEN_GAS},
 };
 
 static const CsandRgba palette[MATERIALS_COUNT] = {
@@ -201,8 +201,12 @@ static void csandSimulate(CsandRenderBuffer buf) {
 
             if (csandMatIsFire(mat)) {
                 tryIgnite(buf, sx, sy);
+                swap_mat = *csandGetMat(buf, sx, sy) & (~MAT_UPDATED_BIT);
+                swap_mat_props = materials[swap_mat];
             } else if (csandMatIsFire(swap_mat)) {
                 tryIgnite(buf, x, y);
+                mat = *csandGetMat(buf, x, y) & (~MAT_UPDATED_BIT);
+                mat_props = materials[mat];
             }
 
             if (mat_props.kind != MAT_KIND_SOLID && swap_mat_props.kind != MAT_KIND_SOLID && swap_mat_props.density < mat_props.density) {
@@ -253,8 +257,9 @@ static void tryIgnite(CsandRenderBuffer buf, unsigned int x, unsigned int y) {
         return;
     }
 
-    for (int dy = 2; dy >= -2; dy--) {
-        for (int dx = -2; dx <= 2; dx++) {
+    const int air_range = 2;
+    for (int dy = air_range; dy >= -air_range; dy--) {
+        for (int dx = -air_range; dx <= air_range; dx++) {
             if (!(dx == 0 && dy == 0) && csandInBounds(buf, x + dx, y + dy) && *csandGetMat(buf, x + dx, y + dy) == MAT_AIR) {
                 switch (mat_props.kind) {
                     case MAT_KIND_SOLID:
@@ -266,7 +271,7 @@ static void tryIgnite(CsandRenderBuffer buf, unsigned int x, unsigned int y) {
                         break;
                 }
 
-                *csandGetMat(buf, x, y) = mat;
+                *csandGetMat(buf, x, y) = mat | MAT_UPDATED_BIT;
                 return;
             }
         }
