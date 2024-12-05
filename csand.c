@@ -150,11 +150,21 @@ static void csandInputCallback(CsandInput input) {
 }
 
 static void csandRenderCallback(unsigned char *data, unsigned short width, unsigned short height) {
+    CsandRenderBuffer render_buf = {data, width, height};
+
+    bool draw = csandPlatformIsMouseButtonPressed(CSAND_MOUSE_BUTTON_LEFT);
+    unsigned short x, y;
+    csandPlatformGetCursorPos(&x, &y);
+
     if (!pause) {
-        CsandRenderBuffer render_buf = {data, width, height};
         for (unsigned long i = 0; i < speed; i++) {
             csandSimulate(render_buf);
+            if (draw) {
+                *csandGetMat(render_buf, x, y) = draw_mat;
+            }
         }
+    } else if (draw) {
+        *csandGetMat(render_buf, x, y) = draw_mat;
     }
 }
 
@@ -200,12 +210,6 @@ static void csandSimulate(CsandRenderBuffer buf) {
                 *csandGetMat(buf, sx, sy) = mat | MAT_UPDATED_BIT;
             }
         }
-    }
-
-    if (csandPlatformIsMouseButtonPressed(CSAND_MOUSE_BUTTON_LEFT)) {
-        unsigned short x, y;
-        csandPlatformGetCursorPos(&x, &y);
-        *csandGetMat(buf, x, y) = draw_mat | MAT_UPDATED_BIT;
     }
 
     for (unsigned int i = 0; i < buf.width * buf.height; i++) {
