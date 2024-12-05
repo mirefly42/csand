@@ -26,6 +26,7 @@ enum {
 static unsigned int pause = 0;
 static unsigned long speed = 1;
 static unsigned char draw_mat = MAT_SAND;
+static bool input_next_frame = false;
 
 typedef enum {
     MAT_KIND_SOLID,
@@ -146,6 +147,10 @@ static void csandInputCallback(CsandInput input) {
                 speed /= 2;
             }
             break;
+        case CSAND_INPUT_NEXT_FRAME:
+            input_next_frame = true;
+            pause = true;
+            break;
     }
 }
 
@@ -156,7 +161,8 @@ static void csandRenderCallback(unsigned char *data, unsigned short width, unsig
     unsigned short x, y;
     csandPlatformGetCursorPos(&x, &y);
 
-    if (!pause) {
+    if (!pause || input_next_frame) {
+        input_next_frame = false;
         for (unsigned long i = 0; i < speed; i++) {
             csandSimulate(render_buf);
             if (draw) {

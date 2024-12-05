@@ -96,6 +96,9 @@ static void csandGlfwKeyCallback(GLFWwindow *window, int key, int scancode, int 
             case GLFW_KEY_MINUS:
                 input_callback(CSAND_INPUT_SPEED_DECREASE);
                 break;
+            case GLFW_KEY_PERIOD:
+                input_callback(CSAND_INPUT_NEXT_FRAME);
+                break;
             default:
                 if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9) {
                     input_callback(key - GLFW_KEY_0 + CSAND_INPUT_SELECT_MAT0);

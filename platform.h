@@ -19,6 +19,7 @@ typedef enum {
     CSAND_INPUT_PAUSE_TOGGLE,
     CSAND_INPUT_SPEED_INCREASE,
     CSAND_INPUT_SPEED_DECREASE,
+    CSAND_INPUT_NEXT_FRAME,
 } CsandInput;
 
 typedef enum {

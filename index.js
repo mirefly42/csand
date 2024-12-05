@@ -53,6 +53,8 @@ async function main() {
                         input_callback(11);
                     } else if (c === "Minus") {
                         input_callback(12);
+                    } else if (c === "Period") {
+                        input_callback(13);
                     }
                 });
             },
