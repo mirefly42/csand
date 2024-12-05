@@ -1,4 +1,6 @@
-Make the web version usable on mobile devices
-Add zoom
 Add ability to increase brush size
 Add heat
+Add zoom
+Make game speed independent of FPS
+Make the web version usable on mobile devices
+Make water freeze on contact with liquid hydrogen
