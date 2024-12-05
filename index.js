@@ -35,12 +35,24 @@ async function main() {
                         input_callback(2);
                     } else if (c === "Digit3") {
                         input_callback(3);
-                    } else if (c === "Space") {
+                    } else if (c === "Digit4") {
                         input_callback(4);
-                    } else if (c === "Equal") {
+                    } else if (c === "Digit5") {
                         input_callback(5);
-                    } else if (c === "Minus") {
+                    } else if (c === "Digit6") {
                         input_callback(6);
+                    } else if (c === "Digit7") {
+                        input_callback(7);
+                    } else if (c === "Digit8") {
+                        input_callback(8);
+                    } else if (c === "Digit9") {
+                        input_callback(9);
+                    } else if (c === "Space") {
+                        input_callback(10);
+                    } else if (c === "Equal") {
+                        input_callback(11);
+                    } else if (c === "Minus") {
+                        input_callback(12);
                     }
                 });
             },

@@ -79,6 +79,13 @@ static void csandInputCallback(CsandInput input) {
         case CSAND_INPUT_SELECT_MAT3:
             draw_mat = MAT_WATER;
             break;
+        case CSAND_INPUT_SELECT_MAT4:
+        case CSAND_INPUT_SELECT_MAT5:
+        case CSAND_INPUT_SELECT_MAT6:
+        case CSAND_INPUT_SELECT_MAT7:
+        case CSAND_INPUT_SELECT_MAT8:
+        case CSAND_INPUT_SELECT_MAT9:
+            break;
         case CSAND_INPUT_PAUSE_TOGGLE:
             pause = !pause;
             break;

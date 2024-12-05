@@ -90,18 +90,6 @@ static void csandGlfwKeyCallback(GLFWwindow *window, int key, int scancode, int 
             case GLFW_KEY_SPACE:
                 input_callback(CSAND_INPUT_PAUSE_TOGGLE);
                 break;
-            case GLFW_KEY_0:
-                input_callback(CSAND_INPUT_SELECT_MAT0);
-                break;
-            case GLFW_KEY_1:
-                input_callback(CSAND_INPUT_SELECT_MAT1);
-                break;
-            case GLFW_KEY_2:
-                input_callback(CSAND_INPUT_SELECT_MAT2);
-                break;
-            case GLFW_KEY_3:
-                input_callback(CSAND_INPUT_SELECT_MAT3);
-                break;
             case GLFW_KEY_EQUAL:
                 input_callback(CSAND_INPUT_SPEED_INCREASE);
                 break;
@@ -109,6 +97,9 @@ static void csandGlfwKeyCallback(GLFWwindow *window, int key, int scancode, int 
                 input_callback(CSAND_INPUT_SPEED_DECREASE);
                 break;
             default:
+                if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9) {
+                    input_callback(key - GLFW_KEY_0 + CSAND_INPUT_SELECT_MAT0);
+                }
                 break;
         }
     }
