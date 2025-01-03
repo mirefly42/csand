@@ -16,6 +16,11 @@ let mouse_y = 0;
 let program = null;
 
 async function main() {
+    document.getElementById("button_toggle_buttons").addEventListener("click", () => {
+        const buttons = document.getElementById("buttons");
+        buttons.hidden = !buttons.hidden;
+    });
+
     vertex_src = await (await fetch("shader.vert")).text();
     fragment_src = await (await fetch("shader.frag")).text();
 
@@ -25,6 +30,23 @@ async function main() {
             csandPlatformSetPalette: csandPlatformSetPalette,
             csandPlatformSetInputCallback: (callback_index) => {
                 input_callback = function_table.get(callback_index);
+                function setButtonInput(id, input) {
+                    document.getElementById(id).addEventListener("pointerdown", () => {input_callback(input);});
+                }
+                setButtonInput("button_air", 0);
+                setButtonInput("button_wall", 1);
+                setButtonInput("button_sand", 2);
+                setButtonInput("button_water", 3);
+                setButtonInput("button_fire", 4);
+                setButtonInput("button_wood", 5);
+                setButtonInput("button_coal", 6);
+                setButtonInput("button_oil", 7);
+                setButtonInput("button_hydrogen_gas", 8);
+                setButtonInput("button_hydrogen_liquid", 9);
+                setButtonInput("button_pause", 10);
+                setButtonInput("button_simulation_speed_plus", 11);
+                setButtonInput("button_simulation_speed_minus", 12);
+                setButtonInput("button_simulate_frame", 13);
                 document.addEventListener("keydown", (event) => {
                     const c = event.code;
                     if (c === "Digit0") {
