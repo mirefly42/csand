@@ -191,7 +191,7 @@ static char *csandReadTextFile(const char *path, long *out_size) {
         goto fail1;
     }
 
-    if (fread(buf, size, 1, file) != 1) {
+    if (fread(buf, 1, size, file) != (size_t)size) {
         perror("fread");
         goto fail2;
     }
