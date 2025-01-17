@@ -2,7 +2,6 @@
 #define CSAND_PLATFORM_H
 
 #include "rgba.h"
-#include <stddef.h>
 #include <stdint.h>
 
 typedef enum {
@@ -27,15 +26,15 @@ typedef enum {
     CSAND_MOUSE_BUTTON_RIGHT,
 } CsandMouseButton;
 
-typedef void (*CsandRenderCallback)(unsigned char *data, unsigned short width, unsigned short height);
+typedef void (*CsandRenderCallback)(void);
 typedef void (*CsandInputCallback)(CsandInput input);
 
 void csandPlatformInit(void);
-void csandPlatformSetPalette(const CsandRgba *colors, uint8_t colors_count);
 void csandPlatformSetRenderCallback(CsandRenderCallback callback);
 void csandPlatformSetInputCallback(CsandInputCallback callback);
 unsigned int csandPlatformIsMouseButtonPressed(CsandMouseButton button);
 void csandPlatformGetCursorPos(unsigned short *x, unsigned short *y);
 void csandPlatformRun(void);
+void csandPlatformPrintErr(const char *str);
 
 #endif

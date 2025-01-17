@@ -1,4 +1,5 @@
 #include "platform.h"
+#include "renderer.h"
 #include "rgba.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -23,10 +24,22 @@ enum {
     MAT_UPDATED_BIT = 0x80
 };
 
+#define WIDTH 128
+#define HEIGHT 64
+
 static unsigned int pause = 0;
 static unsigned long speed = 1;
 static unsigned char draw_mat = MAT_SAND;
+static unsigned char data[WIDTH * HEIGHT];
 static bool input_next_frame = false;
+
+typedef struct CsandRenderBuffer {
+    unsigned char *data;
+    unsigned short width;
+    unsigned short height;
+} CsandRenderBuffer;
+
+static CsandRenderBuffer render_buf = {data, WIDTH, HEIGHT};
 
 typedef enum {
     MAT_KIND_SOLID,
@@ -78,14 +91,8 @@ static const CsandRgba palette[MATERIALS_COUNT] = {
     [MAT_HYDROGEN_LIQUID] = {0x57, 0x8F, 0xC8, 0xFF},
 };
 
-typedef struct CsandRenderBuffer {
-    unsigned char *data;
-    unsigned short width;
-    unsigned short height;
-} CsandRenderBuffer;
-
 static void csandInputCallback(CsandInput input);
-static void csandRenderCallback(unsigned char *data, unsigned short width, unsigned short height);
+static void csandRenderCallback(void);
 static void csandSimulate(CsandRenderBuffer buf);
 static inline unsigned char *csandGetMat(CsandRenderBuffer buf, unsigned int x, unsigned int y);
 static uint32_t csandRand(void);
@@ -96,7 +103,7 @@ static void tryIgnite(CsandRenderBuffer buf, unsigned int x, unsigned int y);
 
 int main(void) {
     csandPlatformInit();
-    csandPlatformSetPalette(palette, MATERIALS_COUNT);
+    csandRendererInit(palette, MATERIALS_COUNT);
     csandPlatformSetInputCallback(csandInputCallback);
     csandPlatformSetRenderCallback(csandRenderCallback);
     csandPlatformRun();
@@ -154,9 +161,7 @@ static void csandInputCallback(CsandInput input) {
     }
 }
 
-static void csandRenderCallback(unsigned char *data, unsigned short width, unsigned short height) {
-    CsandRenderBuffer render_buf = {data, width, height};
-
+static void csandRenderCallback(void) {
     bool draw = csandPlatformIsMouseButtonPressed(CSAND_MOUSE_BUTTON_LEFT);
     unsigned short x, y;
     csandPlatformGetCursorPos(&x, &y);
@@ -172,6 +177,8 @@ static void csandRenderCallback(unsigned char *data, unsigned short width, unsig
     } else if (draw) {
         *csandGetMat(render_buf, x, y) = draw_mat;
     }
+
+    csandRendererRender(data, WIDTH, HEIGHT);
 }
 
 static void csandSimulate(CsandRenderBuffer buf) {

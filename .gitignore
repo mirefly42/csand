@@ -1,3 +1,5 @@
 /csand
 /csand.wasm
 /*.o
+/embed
+/*.embed.h
