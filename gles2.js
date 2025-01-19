@@ -28,6 +28,10 @@ export class GLES2Context {
     gl;
     memory;
     static #api = {
+        glEnable(cap) {
+            this.gl.enable(cap);
+        },
+
         glClearColor(r, g, b, a) {
             this.gl.clearColor(r, g, b, a);
         },

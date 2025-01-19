@@ -32,6 +32,8 @@ static void csandSetRenderTextureSize(unsigned short width, unsigned short heigh
 void csandRendererInit(const CsandRgba *colors, uint8_t colors_count) {
     csand_renderer = (CsandRenderer){0};
 
+    glEnable(GL_CULL_FACE);
+
     GLuint vbo;
     glGenBuffers(1, &vbo);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
