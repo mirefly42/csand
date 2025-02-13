@@ -12,7 +12,7 @@ csand: ${OBJ}
 all: csand csand.wasm
 
 csand.wasm: csand.c renderer.c ${HDR}
-	clang -o $@ csand.c renderer.c --target=wasm32 -nostdlib -Wl,--entry=main,--import-undefined,--export-table ${CFLAGS} ${LDFLAGS}
+	clang -o $@ csand.c renderer.c --target=wasm32 -nostdlib -Wl,--entry=main,--import-undefined,--export-table -Ithird_party/web/include ${CFLAGS} ${LDFLAGS}
 
 embed: embed.c
 	${CC} embed.c -o $@
