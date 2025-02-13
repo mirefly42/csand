@@ -1,8 +1,6 @@
 import { GLES2Context } from "./gles2.js";
-import { getNullTerminatedString } from "./memutils.js";
+import { getNullTerminatedString, Uint16LeArray } from "./memutils.js";
 
-const width = 128;
-const height = 64;
 let function_table = null;
 let input_callback = null;
 let render_callback = null;
@@ -80,10 +78,15 @@ async function main() {
             },
             csandPlatformRun: csandPlatformRun,
             csandPlatformIsMouseButtonPressed: () => {return mouse_down;},
-            csandPlatformGetCursorPos: (x_ptr, y_ptr) => {
-                const view = new DataView(obj.instance.exports.memory.buffer);
-                view.setUint16(x_ptr, mouse_x, true);
-                view.setUint16(y_ptr, mouse_y, true);
+            csandPlatformGetCursorPos: (vec_ptr) => {
+                const vec = new Uint16LeArray(obj.instance.exports.memory.buffer, vec_ptr, 2);
+                vec.set(0, mouse_x);
+                vec.set(1, mouse_y);
+            },
+            csandPlatformGetWindowSize: (vec_ptr) => {
+                const vec = new Uint16LeArray(obj.instance.exports.memory.buffer, vec_ptr, 2);
+                vec.set(0, canvas.width);
+                vec.set(1, canvas.height);
             },
             csandPlatformPrintErr: (str_ptr) => {
                 console.error(getNullTerminatedString(obj.instance.exports.memory.buffer, str_ptr));
@@ -113,8 +116,8 @@ function csandPlatformInit() {
     });
 
     canvas.addEventListener("mousemove", (event) => {
-        mouse_x = event.offsetX * width / canvas.width;
-        mouse_y = height - 1 - Math.floor(event.offsetY * height / canvas.height);
+        mouse_x = event.offsetX;
+        mouse_y = event.offsetY;
     });
 }
 

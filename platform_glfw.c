@@ -1,21 +1,54 @@
+#include "math.h"
 #include "platform.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 
-#define WINDOW_WIDTH 1024
-#define WINDOW_HEIGHT 512
+typedef struct CsandPlatform {
+    GLFWwindow *window;
+    CsandRenderCallback render_callback;
+    CsandInputCallback input_callback;
+} CsandPlatform;
 
-#define WIDTH 128
-#define HEIGHT 64
+static CsandPlatform platform = {0};
 
-static GLFWwindow *window;
+static void csandGlfwErrorCallback(int code, const char *msg) {
+    fprintf(stderr, "glfw error %d: %s\n", code, msg);
+}
 
-static void csandGlfwErrorCallback(int code, const char *msg);
-static void csandGlfwKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods);
-static CsandRenderCallback render_callback = NULL;
-static CsandInputCallback input_callback = NULL;
+static void csandGlfwKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
+    (void)window;
+    (void)scancode;
+    (void)mods;
+
+    if (!platform.input_callback) {
+        return;
+    }
+
+    if (action == GLFW_PRESS) {
+        switch (key) {
+            case GLFW_KEY_SPACE:
+                platform.input_callback(CSAND_INPUT_PAUSE_TOGGLE);
+                break;
+            case GLFW_KEY_EQUAL:
+                platform.input_callback(CSAND_INPUT_SPEED_INCREASE);
+                break;
+            case GLFW_KEY_MINUS:
+                platform.input_callback(CSAND_INPUT_SPEED_DECREASE);
+                break;
+            case GLFW_KEY_PERIOD:
+                platform.input_callback(CSAND_INPUT_NEXT_FRAME);
+                break;
+            default:
+                if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9) {
+                    platform.input_callback(key - GLFW_KEY_0 + CSAND_INPUT_SELECT_MAT0);
+                }
+                break;
+        }
+    }
+}
 
 void csandPlatformInit(void) {
     glfwSetErrorCallback(csandGlfwErrorCallback);
@@ -27,55 +60,19 @@ void csandPlatformInit(void) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-    window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "csand", NULL, NULL);
+    platform.window = glfwCreateWindow(1024, 512, "csand", NULL, NULL);
 
-    glfwMakeContextCurrent(window);
+    glfwMakeContextCurrent(platform.window);
 
-    glfwSetKeyCallback(window, csandGlfwKeyCallback);
-}
-
-static void csandGlfwErrorCallback(int code, const char *msg) {
-    fprintf(stderr, "glfw error %d: %s\n", code, msg);
-}
-
-static void csandGlfwKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
-    (void)window;
-    (void)scancode;
-    (void)mods;
-
-    if (!input_callback) {
-        return;
-    }
-
-    if (action == GLFW_PRESS) {
-        switch (key) {
-            case GLFW_KEY_SPACE:
-                input_callback(CSAND_INPUT_PAUSE_TOGGLE);
-                break;
-            case GLFW_KEY_EQUAL:
-                input_callback(CSAND_INPUT_SPEED_INCREASE);
-                break;
-            case GLFW_KEY_MINUS:
-                input_callback(CSAND_INPUT_SPEED_DECREASE);
-                break;
-            case GLFW_KEY_PERIOD:
-                input_callback(CSAND_INPUT_NEXT_FRAME);
-                break;
-            default:
-                if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9) {
-                    input_callback(key - GLFW_KEY_0 + CSAND_INPUT_SELECT_MAT0);
-                }
-                break;
-        }
-    }
+    glfwSetKeyCallback(platform.window, csandGlfwKeyCallback);
 }
 
 void csandPlatformSetRenderCallback(CsandRenderCallback callback) {
-    render_callback = callback;
+    platform.render_callback = callback;
 }
 
 void csandPlatformSetInputCallback(CsandInputCallback callback) {
-    input_callback = callback;
+    platform.input_callback = callback;
 }
 
 unsigned int csandPlatformIsMouseButtonPressed(CsandMouseButton button) {
@@ -91,35 +88,38 @@ unsigned int csandPlatformIsMouseButtonPressed(CsandMouseButton button) {
             return 0;
     }
 
-    return glfwGetMouseButton(window, glfw_button) == GLFW_PRESS;
+    return glfwGetMouseButton(platform.window, glfw_button) == GLFW_PRESS;
 }
 
-void csandPlatformGetCursorPos(unsigned short *out_x, unsigned short *out_y) {
-        double fx, fy;
-        glfwGetCursorPos(window, &fx, &fy);
+CsandVec2Us csandPlatformGetCursorPos(void) {
+    double fx, fy;
+    glfwGetCursorPos(platform.window, &fx, &fy);
 
-        int x = (int)fx * WIDTH / WINDOW_WIDTH;
-        int y = HEIGHT - 1 - (int)fy * HEIGHT / WINDOW_HEIGHT;
+    return (CsandVec2Us){
+        csandDClamp(fx, 0, USHRT_MAX),
+        csandDClamp(fy, 0, USHRT_MAX),
+    };
+}
 
-        if (x < 0) x = 0;
-        if (x >= WIDTH) x = WIDTH - 1;
+CsandVec2Us csandPlatformGetWindowSize(void) {
+    int width, height;
+    glfwGetWindowSize(platform.window, &width, &height);
 
-        if (y < 0) y = 0;
-        if (y >= HEIGHT) y = HEIGHT - 1;
-
-        *out_x = x;
-        *out_y = y;
+    return (CsandVec2Us){
+        csandUiMin(width, USHRT_MAX),
+        csandUiMin(height, USHRT_MAX),
+    };
 }
 
 void csandPlatformRun(void) {
-    while (!glfwWindowShouldClose(window)) {
+    while (!glfwWindowShouldClose(platform.window)) {
         glfwPollEvents();
 
-        if (render_callback) {
-            render_callback();
+        if (platform.render_callback) {
+            platform.render_callback();
         }
 
-        glfwSwapBuffers(window);
+        glfwSwapBuffers(platform.window);
     }
 }
 

@@ -42,8 +42,24 @@ export function setInt32Le(buffer, ptr, value) {
     view.setInt32(ptr, value, true);
 }
 
-const uint32_size = 4;
+const uint16_size = 2;
+export class Uint16LeArray {
+    #view;
 
+    set(index, value) {
+        this.#view.setUint16(index * uint16_size, value, true);
+    }
+
+    get(index) {
+        return this.#view.getUint16(index * uint16_size, true);
+    }
+
+    constructor(buffer, ptr, len) {
+        this.#view = new DataView(buffer, ptr, len * uint16_size);
+    }
+}
+
+const uint32_size = 4;
 export class Uint32LeArray {
     #view;
 

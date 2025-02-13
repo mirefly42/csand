@@ -1,3 +1,4 @@
+#include "math.h"
 #include "platform.h"
 #include "renderer.h"
 #include "rgba.h"
@@ -161,21 +162,28 @@ static void csandInputCallback(CsandInput input) {
     }
 }
 
+static CsandVec2Us csandScreenSpaceToWorldSpace(CsandVec2Us pos, CsandVec2Us window_size) {
+    return (CsandVec2Us){
+        csandUsMin(pos.x * WIDTH / window_size.x, WIDTH - 1),
+        HEIGHT - 1 - csandUsMin(pos.y * HEIGHT / window_size.y, HEIGHT - 1),
+    };
+}
+
 static void csandRenderCallback(void) {
     bool draw = csandPlatformIsMouseButtonPressed(CSAND_MOUSE_BUTTON_LEFT);
-    unsigned short x, y;
-    csandPlatformGetCursorPos(&x, &y);
+    CsandVec2Us window_size = csandPlatformGetWindowSize();
+    CsandVec2Us cur_pos = csandScreenSpaceToWorldSpace(csandPlatformGetCursorPos(), window_size);
 
     if (!pause || input_next_frame) {
         input_next_frame = false;
         for (unsigned long i = 0; i < speed; i++) {
             csandSimulate(render_buf);
             if (draw) {
-                *csandGetMat(render_buf, x, y) = draw_mat;
+                *csandGetMat(render_buf, cur_pos.x, cur_pos.y) = draw_mat;
             }
         }
     } else if (draw) {
-        *csandGetMat(render_buf, x, y) = draw_mat;
+        *csandGetMat(render_buf, cur_pos.x, cur_pos.y) = draw_mat;
     }
 
     csandRendererRender(data, WIDTH, HEIGHT);

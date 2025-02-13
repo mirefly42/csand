@@ -1,7 +1,7 @@
 #ifndef CSAND_PLATFORM_H
 #define CSAND_PLATFORM_H
 
-#include "rgba.h"
+#include "vec2.h"
 #include <stdint.h>
 
 typedef enum {
@@ -33,7 +33,8 @@ void csandPlatformInit(void);
 void csandPlatformSetRenderCallback(CsandRenderCallback callback);
 void csandPlatformSetInputCallback(CsandInputCallback callback);
 unsigned int csandPlatformIsMouseButtonPressed(CsandMouseButton button);
-void csandPlatformGetCursorPos(unsigned short *x, unsigned short *y);
+CsandVec2Us csandPlatformGetCursorPos(void);
+CsandVec2Us csandPlatformGetWindowSize(void);
 void csandPlatformRun(void);
 void csandPlatformPrintErr(const char *str);
 
