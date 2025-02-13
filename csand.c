@@ -1,5 +1,6 @@
 #include "math.h"
 #include "platform.h"
+#include "random.h"
 #include "renderer.h"
 #include "rgba.h"
 #include <stdbool.h>
@@ -57,9 +58,6 @@ typedef struct CsandMaterialProperties {
     unsigned char decay_mat;
 } CsandMaterialProperties;
 
-/* Maps probability from 0-1 float to 0-65535 uint16_t */
-#define NPROB(x) ((uint16_t)((x) * 0xFFFF))
-
 static const CsandMaterialProperties materials[MATERIALS_COUNT] = {
     [MAT_AIR]             = {"air",             1000,    MAT_KIND_FLUID,  NPROB(0),     NPROB(0),    MAT_AIR},
     [MAT_WALL]            = {"wall",            2500000, MAT_KIND_SOLID,  NPROB(0),     NPROB(0),    MAT_AIR},
@@ -96,9 +94,7 @@ static void csandInputCallback(CsandInput input);
 static void csandRenderCallback(void);
 static void csandSimulate(CsandRenderBuffer buf);
 static inline unsigned char *csandGetMat(CsandRenderBuffer buf, unsigned int x, unsigned int y);
-static uint32_t csandRand(void);
 static bool csandInBounds(CsandRenderBuffer buf, int x, int y);
-static inline bool csandChance(uint16_t prob);
 static inline bool csandMatIsFire(unsigned char mat);
 static void tryIgnite(CsandRenderBuffer buf, unsigned int x, unsigned int y);
 
@@ -246,24 +242,9 @@ static inline unsigned char *csandGetMat(CsandRenderBuffer buf, unsigned int x, 
     return buf.data + buf.width * y + x;
 }
 
-static uint32_t csandRand(void)
-{
-    static uint64_t seed = 1;
-    seed = 6364136223846793005*seed + 1;
-    return seed >> 32;
-}
 
 static bool csandInBounds(CsandRenderBuffer buf, int x, int y) {
     return x >= 0 && x < buf.width && y >= 0 && y < buf.height;
-}
-
-static inline bool csandChance(uint16_t prob) {
-    for (;;) {
-        uint16_t x = csandRand();
-        if (x < 0xFFFF) {
-            return x < prob;
-        }
-    }
 }
 
 static inline bool csandMatIsFire(unsigned char mat) {

@@ -2,7 +2,7 @@
 
 SRC = csand.c platform_glfw.c renderer.c
 EMBED_HDR = shader.vert.embed.h shader.frag.embed.h
-HDR = math.h platform.h renderer.h rgba.h vec2.h ${EMBED_HDR}
+HDR = math.h platform.h random.h renderer.h rgba.h vec2.h ${EMBED_HDR}
 OBJ = ${SRC:.c=.o}
 LIBS = -lglfw -lGLESv2
 
