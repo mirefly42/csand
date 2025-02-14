@@ -27,7 +27,7 @@ async function main() {
             csandPlatformSetInputCallback: (callback_index) => {
                 input_callback = function_table.get(callback_index);
                 function setButtonInput(id, input) {
-                    document.getElementById(id).addEventListener("pointerdown", () => {input_callback(input);});
+                    document.getElementById(id).addEventListener("click", () => {input_callback(input);});
                 }
                 document.getElementById("button_fullscreen").addEventListener("click", () => {
                     toggleFullscreen();
