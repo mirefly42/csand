@@ -63,6 +63,7 @@ async function main() {
                     } else if (c === "Digit9") {
                         input_callback(9);
                     } else if (c === "Space") {
+                        event.preventDefault();
                         input_callback(10);
                     } else if (c === "Equal") {
                         input_callback(11);
