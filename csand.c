@@ -100,9 +100,10 @@ static void tryIgnite(CsandRenderBuffer buf, unsigned int x, unsigned int y);
 
 int main(void) {
     csandPlatformInit();
-    csandRendererInit(palette, MATERIALS_COUNT);
+    csandRendererInit((CsandVec2Us){WIDTH, HEIGHT}, csandPlatformGetFramebufferSize(), palette, MATERIALS_COUNT);
     csandPlatformSetInputCallback(csandInputCallback);
     csandPlatformSetRenderCallback(csandRenderCallback);
+    csandPlatformSetFramebufferSizeCallback(csandRendererUpdateViewport);
     csandPlatformRun();
 }
 
@@ -158,17 +159,9 @@ static void csandInputCallback(CsandInput input) {
     }
 }
 
-static CsandVec2Us csandScreenSpaceToWorldSpace(CsandVec2Us pos, CsandVec2Us window_size) {
-    return (CsandVec2Us){
-        csandUsMin(pos.x * WIDTH / window_size.x, WIDTH - 1),
-        HEIGHT - 1 - csandUsMin(pos.y * HEIGHT / window_size.y, HEIGHT - 1),
-    };
-}
-
 static void csandRenderCallback(void) {
     bool draw = csandPlatformIsMouseButtonPressed(CSAND_MOUSE_BUTTON_LEFT);
-    CsandVec2Us window_size = csandPlatformGetWindowSize();
-    CsandVec2Us cur_pos = csandScreenSpaceToWorldSpace(csandPlatformGetCursorPos(), window_size);
+    CsandVec2Us cur_pos = csandRendererScreenSpaceToWorldSpace(csandPlatformGetCursorPos());
 
     if (!pause || input_next_frame) {
         input_next_frame = false;

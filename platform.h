@@ -28,13 +28,16 @@ typedef enum {
 
 typedef void (*CsandRenderCallback)(void);
 typedef void (*CsandInputCallback)(CsandInput input);
+typedef void (*CsandFramebufferSizeCallback)(CsandVec2Us size);
 
 void csandPlatformInit(void);
 void csandPlatformSetRenderCallback(CsandRenderCallback callback);
 void csandPlatformSetInputCallback(CsandInputCallback callback);
+void csandPlatformSetFramebufferSizeCallback(CsandFramebufferSizeCallback callback);
 unsigned int csandPlatformIsMouseButtonPressed(CsandMouseButton button);
 CsandVec2Us csandPlatformGetCursorPos(void);
 CsandVec2Us csandPlatformGetWindowSize(void);
+CsandVec2Us csandPlatformGetFramebufferSize(void);
 void csandPlatformRun(void);
 void csandPlatformPrintErr(const char *str);
 

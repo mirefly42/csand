@@ -4,12 +4,14 @@ import { getNullTerminatedString, Uint16LeArray } from "./memutils.js";
 let function_table = null;
 let input_callback = null;
 let render_callback = null;
+let framebuffer_size_callback = null;
 let canvas = null;
 let gl = null;
 let obj = null;
 let mouse_down = false;
 let mouse_x = 0;
 let mouse_y = 0;
+let scratch_buf_ptr = 0;
 const gles2_context = new GLES2Context(null, null);
 
 async function main() {
@@ -77,6 +79,9 @@ async function main() {
             csandPlatformSetRenderCallback: (callback_index) => {
                 render_callback = function_table.get(callback_index);
             },
+            csandPlatformSetFramebufferSizeCallback: (callback_index) => {
+                framebuffer_size_callback = function_table.get(callback_index);
+            },
             csandPlatformRun: csandPlatformRun,
             csandPlatformIsMouseButtonPressed: () => {return mouse_down;},
             csandPlatformGetCursorPos: (vec_ptr) => {
@@ -84,11 +89,8 @@ async function main() {
                 vec.set(0, mouse_x);
                 vec.set(1, mouse_y);
             },
-            csandPlatformGetWindowSize: (vec_ptr) => {
-                const vec = new Uint16LeArray(obj.instance.exports.memory.buffer, vec_ptr, 2);
-                vec.set(0, canvas.width);
-                vec.set(1, canvas.height);
-            },
+            csandPlatformGetWindowSize: csandPlatformGetWindowSize,
+            csandPlatformGetFramebufferSize: csandPlatformGetWindowSize,
             csandPlatformPrintErr: (str_ptr) => {
                 console.error(getNullTerminatedString(obj.instance.exports.memory.buffer, str_ptr));
             },
@@ -100,11 +102,25 @@ async function main() {
     gles2_context.memory = obj.instance.exports.memory;
 
     function_table = obj.instance.exports.__indirect_function_table;
+    const wasm_page_size = 64 * 1024;
+    scratch_buf_ptr = obj.instance.exports.memory.grow(1) * wasm_page_size;
     obj.instance.exports.main();
+}
+
+function resizeCanvas(width, height) {
+    canvas.width = width;
+    canvas.height = height;
+
+    if (framebuffer_size_callback != null) {
+        csandPlatformGetWindowSize(scratch_buf_ptr);
+        framebuffer_size_callback(scratch_buf_ptr);
+    }
 }
 
 function csandPlatformInit() {
     canvas = document.getElementById("canvas");
+    resizeCanvas(window.innerWidth, window.innerHeight);
+
     gl = canvas.getContext("webgl");
     gles2_context.gl = gl;
 
@@ -120,6 +136,10 @@ function csandPlatformInit() {
         mouse_x = event.offsetX;
         mouse_y = event.offsetY;
     });
+
+    window.addEventListener("resize", (event) => {
+        resizeCanvas(window.innerWidth, window.innerHeight);
+    });
 }
 
 function csandPlatformRun() {
@@ -128,6 +148,13 @@ function csandPlatformRun() {
     }
 
     requestAnimationFrame(csandPlatformRun);
+}
+
+function csandPlatformGetWindowSize(vec_ptr) {
+    const vec = new Uint16LeArray(obj.instance.exports.memory.buffer, vec_ptr, 2);
+
+    vec.set(0, canvas.width);
+    vec.set(1, canvas.height);
 }
 
 main();

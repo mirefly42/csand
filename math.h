@@ -1,6 +1,8 @@
 #ifndef CSAND_MATH_H
 #define CSAND_MATH_H
 
+#include "x_macros.h"
+
 #define CSAND_GEN_CLAMP(type, name) \
     static inline type csand##name##Clamp(type x, type min, type max) { \
         if (x <= min) { \
@@ -21,8 +23,6 @@
     CSAND_GEN_CLAMP(type, name) \
     CSAND_GEN_MIN(type, name)
 
-CSAND_GEN_MATH(double, D)
-CSAND_GEN_MATH(unsigned short, Us)
-CSAND_GEN_MATH(unsigned int, Ui)
+CSAND_X_TYPES(CSAND_GEN_MATH)
 
 #endif

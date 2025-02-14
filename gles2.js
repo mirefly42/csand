@@ -32,6 +32,10 @@ export class GLES2Context {
             this.gl.enable(cap);
         },
 
+        glViewport(x, y, width, height) {
+            this.gl.viewport(x, y, width, height);
+        },
+
         glClearColor(r, g, b, a) {
             this.gl.clearColor(r, g, b, a);
         },

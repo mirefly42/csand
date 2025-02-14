@@ -10,6 +10,7 @@ typedef struct CsandPlatform {
     GLFWwindow *window;
     CsandRenderCallback render_callback;
     CsandInputCallback input_callback;
+    CsandFramebufferSizeCallback framebuffer_size_callback;
 } CsandPlatform;
 
 static CsandPlatform platform = {0};
@@ -50,6 +51,17 @@ static void csandGlfwKeyCallback(GLFWwindow *window, int key, int scancode, int 
     }
 }
 
+static void csandGlfwFramebufferSizeCallback(GLFWwindow *window, int width, int height) {
+    (void)window;
+
+    if (platform.framebuffer_size_callback) {
+        platform.framebuffer_size_callback((CsandVec2Us){
+            csandUiMin(width, USHRT_MAX),
+            csandUiMin(height, USHRT_MAX),
+        });
+    }
+}
+
 void csandPlatformInit(void) {
     glfwSetErrorCallback(csandGlfwErrorCallback);
 
@@ -58,13 +70,13 @@ void csandPlatformInit(void) {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
     platform.window = glfwCreateWindow(1024, 512, "csand", NULL, NULL);
 
     glfwMakeContextCurrent(platform.window);
 
     glfwSetKeyCallback(platform.window, csandGlfwKeyCallback);
+    glfwSetFramebufferSizeCallback(platform.window, csandGlfwFramebufferSizeCallback);
 }
 
 void csandPlatformSetRenderCallback(CsandRenderCallback callback) {
@@ -73,6 +85,10 @@ void csandPlatformSetRenderCallback(CsandRenderCallback callback) {
 
 void csandPlatformSetInputCallback(CsandInputCallback callback) {
     platform.input_callback = callback;
+}
+
+void csandPlatformSetFramebufferSizeCallback(CsandFramebufferSizeCallback callback) {
+    platform.framebuffer_size_callback = callback;
 }
 
 unsigned int csandPlatformIsMouseButtonPressed(CsandMouseButton button) {
@@ -104,6 +120,16 @@ CsandVec2Us csandPlatformGetCursorPos(void) {
 CsandVec2Us csandPlatformGetWindowSize(void) {
     int width, height;
     glfwGetWindowSize(platform.window, &width, &height);
+
+    return (CsandVec2Us){
+        csandUiMin(width, USHRT_MAX),
+        csandUiMin(height, USHRT_MAX),
+    };
+}
+
+CsandVec2Us csandPlatformGetFramebufferSize(void) {
+    int width, height;
+    glfwGetFramebufferSize(platform.window, &width, &height);
 
     return (CsandVec2Us){
         csandUiMin(width, USHRT_MAX),
