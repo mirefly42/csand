@@ -27,7 +27,7 @@ enum {
 };
 
 #define WIDTH 128
-#define HEIGHT 64
+#define HEIGHT 72
 
 static unsigned int pause = 0;
 static unsigned long speed = 1;
