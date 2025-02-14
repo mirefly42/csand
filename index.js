@@ -9,6 +9,7 @@ let canvas = null;
 let gl = null;
 let obj = null;
 let mouse_down = false;
+let captured_pointer_id = null;
 let mouse_x = 0;
 let mouse_y = 0;
 let scratch_buf_ptr = 0;
@@ -129,22 +130,52 @@ function csandPlatformInit() {
     gl = canvas.getContext("webgl");
     gles2_context.gl = gl;
 
-    canvas.addEventListener("mousedown", (event) => {
-        if (event.button === 0) mouse_down = true;
+    canvas.addEventListener("pointerdown", (event) => {
+        if (!mouse_down && event.button === 0) {
+            canvas.setPointerCapture(event.pointerId);
+            captured_pointer_id = event.pointerId;
+            updateMousePosition(event.offsetX, event.offsetY);
+            mouse_down = true;
+        }
     });
 
-    document.addEventListener("mouseup", (event) => {
-        if (event.button === 0) mouse_down = false;
-    });
+    function pointerUp(event) {
+        if (event.pointerId === captured_pointer_id) {
+            canvas.releasePointerCapture(event.pointerId);
+            captured_pointer_id = null;
+            updateMousePosition(event.offsetX, event.offsetY);
+            mouse_down = false;
+        }
+    }
 
-    canvas.addEventListener("mousemove", (event) => {
-        mouse_x = event.offsetX;
-        mouse_y = event.offsetY;
+    canvas.addEventListener("pointercancel", pointerUp);
+    canvas.addEventListener("pointerup", pointerUp);
+
+    canvas.addEventListener("pointermove", (event) => {
+        if (event.pointerId === captured_pointer_id) {
+            updateMousePosition(event.offsetX, event.offsetY);
+        }
     });
 
     window.addEventListener("resize", (event) => {
         resizeCanvas(window.innerWidth, window.innerHeight);
     });
+}
+
+function clamp(x, min, max) {
+    if (x <= min) {
+        return min;
+    } else if (x <= max) {
+        return x;
+    } else {
+        return max;
+    }
+}
+
+function updateMousePosition(x, y) {
+    const uint16_max = 65535;
+    mouse_x = clamp(x, 0, uint16_max);
+    mouse_y = clamp(y, 0, uint16_max);
 }
 
 function toggleFullscreen() {
