@@ -28,6 +28,9 @@ async function main() {
                 function setButtonInput(id, input) {
                     document.getElementById(id).addEventListener("pointerdown", () => {input_callback(input);});
                 }
+                document.getElementById("button_fullscreen").addEventListener("click", () => {
+                    toggleFullscreen();
+                });
                 setButtonInput("button_air", 0);
                 setButtonInput("button_wall", 1);
                 setButtonInput("button_sand", 2);
@@ -73,6 +76,8 @@ async function main() {
                         input_callback(12);
                     } else if (c === "Period") {
                         input_callback(13);
+                    } else if (c === "KeyF") {
+                        toggleFullscreen();
                     }
                 });
             },
@@ -140,6 +145,14 @@ function csandPlatformInit() {
     window.addEventListener("resize", (event) => {
         resizeCanvas(window.innerWidth, window.innerHeight);
     });
+}
+
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        game.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
 }
 
 function csandPlatformRun() {

@@ -11,12 +11,50 @@ typedef struct CsandPlatform {
     CsandRenderCallback render_callback;
     CsandInputCallback input_callback;
     CsandFramebufferSizeCallback framebuffer_size_callback;
+    CsandVec2I windowed_mode_pos;
+    CsandVec2I windowed_mode_size;
 } CsandPlatform;
 
 static CsandPlatform platform = {0};
 
 static void csandGlfwErrorCallback(int code, const char *msg) {
     fprintf(stderr, "glfw error %d: %s\n", code, msg);
+}
+
+static void csandToggleFullscreen(void) {
+    if (glfwGetWindowMonitor(platform.window)) {
+        glfwSetWindowMonitor(
+            platform.window,
+            NULL,
+            platform.windowed_mode_pos.x,
+            platform.windowed_mode_pos.y,
+            platform.windowed_mode_size.x,
+            platform.windowed_mode_size.y,
+            GLFW_DONT_CARE
+        );
+    } else {
+        glfwGetWindowPos(
+            platform.window,
+            &platform.windowed_mode_pos.x,
+            &platform.windowed_mode_pos.y
+        );
+
+        glfwGetWindowSize(
+            platform.window,
+            &platform.windowed_mode_size.x,
+            &platform.windowed_mode_size.y
+        );
+
+        GLFWmonitor *mon = glfwGetPrimaryMonitor();
+        const GLFWvidmode *mode = glfwGetVideoMode(mon);
+        glfwSetWindowMonitor(
+            platform.window,
+            mon,
+            0, 0,
+            mode->width, mode->height,
+            GLFW_DONT_CARE
+        );
+    }
 }
 
 static void csandGlfwKeyCallback(GLFWwindow *window, int key, int scancode, int action, int mods) {
@@ -41,6 +79,9 @@ static void csandGlfwKeyCallback(GLFWwindow *window, int key, int scancode, int 
                 break;
             case GLFW_KEY_PERIOD:
                 platform.input_callback(CSAND_INPUT_NEXT_FRAME);
+                break;
+            case GLFW_KEY_F:
+                csandToggleFullscreen();
                 break;
             default:
                 if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9) {
@@ -71,7 +112,13 @@ void csandPlatformInit(void) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
-    platform.window = glfwCreateWindow(1024, 512, "csand", NULL, NULL);
+    platform.windowed_mode_size = (CsandVec2I){1024, 512};
+    platform.window = glfwCreateWindow(
+        platform.windowed_mode_size.x, platform.windowed_mode_size.y,
+        "csand",
+        NULL,
+        NULL
+    );
 
     glfwMakeContextCurrent(platform.window);
 
