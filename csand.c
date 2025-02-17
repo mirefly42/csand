@@ -29,6 +29,9 @@ enum {
 #define WIDTH 128
 #define HEIGHT 72
 
+#define TARGET_TICK_DELAY (1.0/60.0 - 0.001)
+
+static double next_tick_time = 0.0;
 static unsigned int pause = 0;
 static unsigned long speed = 1;
 static unsigned char draw_mat = MAT_SAND;
@@ -91,7 +94,7 @@ static const CsandRgba palette[MATERIALS_COUNT] = {
 };
 
 static void csandInputCallback(CsandInput input);
-static void csandRenderCallback(void);
+static void csandRenderCallback(double time);
 static void csandSimulate(CsandRenderBuffer buf);
 static inline unsigned char *csandGetMat(CsandRenderBuffer buf, unsigned int x, unsigned int y);
 static bool csandInBounds(CsandRenderBuffer buf, int x, int y);
@@ -159,11 +162,11 @@ static void csandInputCallback(CsandInput input) {
     }
 }
 
-static void csandRenderCallback(void) {
+static void csandRenderCallback(double time) {
     bool draw = csandPlatformIsMouseButtonPressed(CSAND_MOUSE_BUTTON_LEFT);
     CsandVec2Us cur_pos = csandRendererScreenSpaceToWorldSpace(csandPlatformGetCursorPos());
 
-    if (!pause || input_next_frame) {
+    if (time >= next_tick_time && (!pause || input_next_frame)) {
         input_next_frame = false;
         for (unsigned long i = 0; i < speed; i++) {
             csandSimulate(render_buf);
@@ -171,6 +174,7 @@ static void csandRenderCallback(void) {
                 *csandGetMat(render_buf, cur_pos.x, cur_pos.y) = draw_mat;
             }
         }
+        next_tick_time = time + TARGET_TICK_DELAY;
     } else if (draw) {
         *csandGetMat(render_buf, cur_pos.x, cur_pos.y) = draw_mat;
     }

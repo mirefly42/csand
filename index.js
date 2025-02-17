@@ -88,7 +88,9 @@ async function main() {
             csandPlatformSetFramebufferSizeCallback: (callback_index) => {
                 framebuffer_size_callback = function_table.get(callback_index);
             },
-            csandPlatformRun: csandPlatformRun,
+            csandPlatformRun: () => {
+                requestAnimationFrame(csandPlatformRun);
+            },
             csandPlatformIsMouseButtonPressed: () => {return mouse_down;},
             csandPlatformGetCursorPos: (vec_ptr) => {
                 const vec = new Uint16LeArray(obj.instance.exports.memory.buffer, vec_ptr, 2);
@@ -186,9 +188,9 @@ function toggleFullscreen() {
     }
 }
 
-function csandPlatformRun() {
+function csandPlatformRun(time) {
     if (render_callback != null) {
-        render_callback();
+        render_callback(time / 1000.0);
     }
 
     requestAnimationFrame(csandPlatformRun);

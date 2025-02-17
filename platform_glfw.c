@@ -189,7 +189,7 @@ void csandPlatformRun(void) {
         glfwPollEvents();
 
         if (platform.render_callback) {
-            platform.render_callback();
+            platform.render_callback(glfwGetTime());
         }
 
         glfwSwapBuffers(platform.window);

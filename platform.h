@@ -26,7 +26,7 @@ typedef enum {
     CSAND_MOUSE_BUTTON_RIGHT,
 } CsandMouseButton;
 
-typedef void (*CsandRenderCallback)(void);
+typedef void (*CsandRenderCallback)(double time);
 typedef void (*CsandInputCallback)(CsandInput input);
 typedef void (*CsandFramebufferSizeCallback)(CsandVec2Us size);
 
