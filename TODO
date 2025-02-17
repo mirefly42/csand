@@ -4,8 +4,6 @@ Add zoom
 Fix GL_UNPACK_ALIGNMENT
 Fix inconsistencies in code
 Handle WebGL context loss properly
-Make game speed independent of FPS
 Make the glfw client repeat events
-Make the web version usable on mobile devices
 Make water freeze on contact with liquid hydrogen
 Print shader/program info log even when compilation/linking succeeds
