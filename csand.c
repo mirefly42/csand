@@ -35,7 +35,7 @@ static double next_tick_time = 0.0;
 static unsigned int pause = 0;
 static unsigned long speed = 1;
 static unsigned char draw_mat = MAT_SAND;
-static unsigned char data[WIDTH * HEIGHT];
+static unsigned char data[WIDTH * HEIGHT] = {0};
 static bool input_next_frame = false;
 
 typedef struct CsandRenderBuffer {
