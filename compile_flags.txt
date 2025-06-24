@@ -1,2 +1,3 @@
 -xc
 -std=c99
+-Ithird_party/include

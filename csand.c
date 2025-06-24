@@ -1,9 +1,11 @@
-#include "math.h"
+#include "nuklear_config.h"
 #include "platform.h"
 #include "random.h"
 #include "renderer.h"
 #include "rgba.h"
+#include <limits.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #define SPEED_LIMIT 128
@@ -22,9 +24,10 @@ enum {
     MAT_OIL,
     MAT_HYDROGEN_GAS,
     MAT_HYDROGEN_LIQUID,
-    MATERIALS_COUNT,
     MAT_UPDATED_BIT = 0x80
 };
+
+#define MATERIALS_COUNT MAT_UPDATED_BIT
 
 #define WIDTH 128
 #define HEIGHT 72
@@ -37,6 +40,9 @@ static unsigned long speed = 1;
 static unsigned char draw_mat = MAT_SAND;
 static unsigned char data[WIDTH * HEIGHT] = {0};
 static bool input_next_frame = false;
+static bool any_nuklear_item_active = false;
+static bool developer_menu_enabled = false;
+static struct nk_rect developer_menu_bounds = {10, 10, 730, 540};
 
 typedef struct CsandRenderBuffer {
     unsigned char *data;
@@ -50,6 +56,7 @@ typedef enum {
     MAT_KIND_SOLID,
     MAT_KIND_POWDER,
     MAT_KIND_FLUID,
+    MAT_KINDS_COUNT,
 } CsandMaterialKind;
 
 typedef struct CsandMaterialProperties {
@@ -61,7 +68,7 @@ typedef struct CsandMaterialProperties {
     unsigned char decay_mat;
 } CsandMaterialProperties;
 
-static const CsandMaterialProperties materials[MATERIALS_COUNT] = {
+static CsandMaterialProperties materials[MATERIALS_COUNT] = {
     [MAT_AIR]             = {"air",             1000,    MAT_KIND_FLUID,  NPROB(0),     NPROB(0),    MAT_AIR},
     [MAT_WALL]            = {"wall",            2500000, MAT_KIND_SOLID,  NPROB(0),     NPROB(0),    MAT_AIR},
     [MAT_SAND]            = {"sand",            1500000, MAT_KIND_POWDER, NPROB(0),     NPROB(0),    MAT_AIR},
@@ -77,7 +84,7 @@ static const CsandMaterialProperties materials[MATERIALS_COUNT] = {
     [MAT_HYDROGEN_LIQUID] = {"hydrogen liquid", 70800,   MAT_KIND_FLUID,  3,            NPROB(0.1),  MAT_HYDROGEN_GAS},
 };
 
-static const CsandRgba palette[MATERIALS_COUNT] = {
+static CsandRgba palette[MATERIALS_COUNT] = {
     [MAT_AIR]             = {0x00, 0x00, 0x00, 0xFF},
     [MAT_WALL]            = {0xFF, 0x00, 0xFF, 0xFF},
     [MAT_SAND]            = {0xFF, 0xFF, 0x00, 0xFF},
@@ -93,7 +100,29 @@ static const CsandRgba palette[MATERIALS_COUNT] = {
     [MAT_HYDROGEN_LIQUID] = {0x57, 0x8F, 0xC8, 0xFF},
 };
 
-static void csandInputCallback(CsandInput input);
+static void csandKeyCallback(CsandKey key, CsandAction action, CsandModSet mods);
+static void csandCharCallback(uint32_t codepoint);
+static void csandMouseButtonCallback(CsandMouseButton button, unsigned int pressed) {
+    CsandVec2Us pos = csandPlatformGetCursorPos();
+    struct nk_context *nk_ctx = csandRendererNuklearContext();
+    switch (button) {
+        case CSAND_MOUSE_BUTTON_LEFT:
+            nk_input_button(nk_ctx, NK_BUTTON_LEFT, pos.x, pos.y, pressed);
+            break;
+        case CSAND_MOUSE_BUTTON_RIGHT:
+            nk_input_button(nk_ctx, NK_BUTTON_RIGHT, pos.x, pos.y, pressed);
+            break;
+    }
+}
+
+static void csandMouseMotionCallback(double x, double y) {
+    nk_input_motion(csandRendererNuklearContext(), x, y);
+}
+
+static void csandMouseScrollCallback(double x, double y) {
+    nk_input_scroll(csandRendererNuklearContext(), nk_vec2(x, y));
+}
+
 static void csandRenderCallback(double time);
 static void csandSimulate(CsandRenderBuffer buf);
 static inline unsigned char *csandGetMat(CsandRenderBuffer buf, unsigned int x, unsigned int y);
@@ -104,66 +133,281 @@ static void tryIgnite(CsandRenderBuffer buf, unsigned int x, unsigned int y);
 int main(void) {
     csandPlatformInit();
     csandRendererInit((CsandVec2Us){WIDTH, HEIGHT}, csandPlatformGetFramebufferSize(), palette, MATERIALS_COUNT);
-    csandPlatformSetInputCallback(csandInputCallback);
+    csandPlatformSetKeyCallback(csandKeyCallback);
+    csandPlatformSetCharCallback(csandCharCallback);
+    csandPlatformSetMouseButtonCallback(csandMouseButtonCallback);
+    csandPlatformSetMouseMotionCallback(csandMouseMotionCallback);
+    csandPlatformSetMouseScrollCallback(csandMouseScrollCallback);
     csandPlatformSetRenderCallback(csandRenderCallback);
     csandPlatformSetFramebufferSizeCallback(csandRendererUpdateViewport);
+    nk_input_begin(csandRendererNuklearContext());
     csandPlatformRun();
 }
 
-static void csandInputCallback(CsandInput input) {
-    switch (input) {
-        case CSAND_INPUT_SELECT_MAT0:
-            draw_mat = MAT_AIR;
+static void csandSendKeyStateToNuklear(CsandKey key, CsandAction action, CsandModSet mods) {
+    struct nk_context *nk_ctx = csandRendererNuklearContext();
+    switch (key) {
+        case CSAND_KEY_LEFT_SHIFT:
+        case CSAND_KEY_RIGHT_SHIFT:
+            nk_input_key(nk_ctx, NK_KEY_SHIFT, action);
             break;
-        case CSAND_INPUT_SELECT_MAT1:
-            draw_mat = MAT_WALL;
+        case CSAND_KEY_LEFT_CONTROL:
+        case CSAND_KEY_RIGHT_CONTROL:
+            nk_input_key(nk_ctx, NK_KEY_CTRL, action);
             break;
-        case CSAND_INPUT_SELECT_MAT2:
-            draw_mat = MAT_SAND;
+        case CSAND_KEY_DELETE:
+            nk_input_key(nk_ctx, NK_KEY_DEL, action);
             break;
-        case CSAND_INPUT_SELECT_MAT3:
-            draw_mat = MAT_WATER;
+        case CSAND_KEY_ENTER:
+            nk_input_key(nk_ctx, NK_KEY_ENTER, action);
             break;
-        case CSAND_INPUT_SELECT_MAT4:
-            draw_mat = MAT_FIRE_GAS;
+        case CSAND_KEY_TAB:
+            nk_input_key(nk_ctx, NK_KEY_TAB, action);
             break;
-        case CSAND_INPUT_SELECT_MAT5:
-            draw_mat = MAT_WOOD;
+        case CSAND_KEY_BACKSPACE:
+            nk_input_key(nk_ctx, NK_KEY_BACKSPACE, action);
             break;
-        case CSAND_INPUT_SELECT_MAT6:
-            draw_mat = MAT_COAL;
-            break;
-        case CSAND_INPUT_SELECT_MAT7:
-            draw_mat = MAT_OIL;
-            break;
-        case CSAND_INPUT_SELECT_MAT8:
-            draw_mat = MAT_HYDROGEN_GAS;
-            break;
-        case CSAND_INPUT_SELECT_MAT9:
-            draw_mat = MAT_HYDROGEN_LIQUID;
-            break;
-        case CSAND_INPUT_PAUSE_TOGGLE:
-            pause = !pause;
-            break;
-        case CSAND_INPUT_SPEED_INCREASE:
-            if (speed < SPEED_LIMIT) {
-                speed *= 2;
+        case CSAND_KEY_C:
+            if (mods == CSAND_MOD_CONTROL) {
+                nk_input_key(nk_ctx, NK_KEY_COPY, action);
             }
             break;
-        case CSAND_INPUT_SPEED_DECREASE:
-            if (speed > 1) {
-                speed /= 2;
+        case CSAND_KEY_X:
+            if (mods == CSAND_MOD_CONTROL) {
+                nk_input_key(nk_ctx, NK_KEY_CUT, action);
             }
             break;
-        case CSAND_INPUT_NEXT_FRAME:
-            input_next_frame = true;
-            pause = true;
+        case CSAND_KEY_V:
+            if (mods == CSAND_MOD_CONTROL) {
+                nk_input_key(nk_ctx, NK_KEY_PASTE, action);
+            }
+            break;
+        case CSAND_KEY_UP:
+            nk_input_key(nk_ctx, NK_KEY_UP, action);
+            break;
+        case CSAND_KEY_DOWN:
+            nk_input_key(nk_ctx, NK_KEY_DOWN, action);
+            break;
+        case CSAND_KEY_LEFT:
+            if (mods == CSAND_MOD_CONTROL) {
+                nk_input_key(nk_ctx, NK_KEY_TEXT_WORD_LEFT, action);
+            } else {
+                nk_input_key(nk_ctx, NK_KEY_LEFT, action);
+            }
+            break;
+        case CSAND_KEY_RIGHT:
+            if (mods == CSAND_MOD_CONTROL) {
+                nk_input_key(nk_ctx, NK_KEY_TEXT_WORD_RIGHT, action);
+            } else {
+                nk_input_key(nk_ctx, NK_KEY_RIGHT, action);
+            }
+            break;
+        case CSAND_KEY_B:
+            if (mods == CSAND_MOD_CONTROL) {
+                nk_input_key(nk_ctx, NK_KEY_TEXT_LINE_START, action);
+            }
+            break;
+        case CSAND_KEY_E:
+            if (mods == CSAND_MOD_CONTROL) {
+                nk_input_key(nk_ctx, NK_KEY_TEXT_LINE_END, action);
+            }
+            break;
+        case CSAND_KEY_HOME:
+            nk_input_key(nk_ctx, NK_KEY_TEXT_START, action);
+            nk_input_key(nk_ctx, NK_KEY_SCROLL_START, action);
+            break;
+        case CSAND_KEY_END:
+            nk_input_key(nk_ctx, NK_KEY_TEXT_END, action);
+            nk_input_key(nk_ctx, NK_KEY_SCROLL_END, action);
+            break;
+        case CSAND_KEY_Z:
+            if (mods == CSAND_MOD_CONTROL) {
+                nk_input_key(nk_ctx, NK_KEY_TEXT_UNDO, action);
+            }
+            break;
+        case CSAND_KEY_R:
+            if (mods == CSAND_MOD_CONTROL) {
+                nk_input_key(nk_ctx, NK_KEY_TEXT_REDO, action);
+            }
+            break;
+        case CSAND_KEY_A:
+            if (mods == CSAND_MOD_CONTROL) {
+                nk_input_key(nk_ctx, NK_KEY_TEXT_SELECT_ALL, action);
+            }
+        default:
             break;
     }
 }
 
+static void csandKeyCallback(CsandKey key, CsandAction action, CsandModSet mods) {
+    csandSendKeyStateToNuklear(key, action, mods);
+
+    if (action != CSAND_ACTION_PRESS || any_nuklear_item_active) return;
+
+    switch (key) {
+        case CSAND_KEY_0:
+            draw_mat = MAT_AIR;
+            break;
+        case CSAND_KEY_1:
+            draw_mat = MAT_WALL;
+            break;
+        case CSAND_KEY_2:
+            draw_mat = MAT_SAND;
+            break;
+        case CSAND_KEY_3:
+            draw_mat = MAT_WATER;
+            break;
+        case CSAND_KEY_4:
+            draw_mat = MAT_FIRE_GAS;
+            break;
+        case CSAND_KEY_5:
+            draw_mat = MAT_WOOD;
+            break;
+        case CSAND_KEY_6:
+            draw_mat = MAT_COAL;
+            break;
+        case CSAND_KEY_7:
+            draw_mat = MAT_OIL;
+            break;
+        case CSAND_KEY_8:
+            draw_mat = MAT_HYDROGEN_GAS;
+            break;
+        case CSAND_KEY_9:
+            draw_mat = MAT_HYDROGEN_LIQUID;
+            break;
+        case CSAND_KEY_SPACE:
+            pause = !pause;
+            break;
+        case CSAND_KEY_EQUAL:
+            if (speed < SPEED_LIMIT) {
+                speed *= 2;
+            }
+            break;
+        case CSAND_KEY_MINUS:
+            if (speed > 1) {
+                speed /= 2;
+            }
+            break;
+        case CSAND_KEY_PERIOD:
+            input_next_frame = true;
+            pause = true;
+            break;
+        case CSAND_KEY_F:
+            csandPlatformToggleFullscreen();
+            break;
+        case CSAND_KEY_TAB:
+            developer_menu_enabled = !developer_menu_enabled;
+            break;
+        default:
+            break;
+    }
+}
+
+static void csandCharCallback(uint32_t codepoint) {
+    nk_input_unicode(csandRendererNuklearContext(), codepoint);
+}
+
+static void csandDrawDeveloperMenu(void) {
+    struct nk_context *nk_ctx = csandRendererNuklearContext();
+
+    nk_flags win_flags = NK_WINDOW_BORDER | NK_WINDOW_MOVABLE |
+        NK_WINDOW_SCALABLE | NK_WINDOW_TITLE;
+
+    if (nk_begin(nk_ctx, "Developer menu", developer_menu_bounds, win_flags)) {
+        developer_menu_bounds = nk_window_get_bounds(nk_ctx);
+
+        float id_width = 25;
+        float name_width = 120;
+        float density_width = 90;
+        float other_width = 80;
+        float row_height = 25;
+        int cols = 8;
+        nk_flags align = NK_TEXT_ALIGN_LEFT | NK_TEXT_ALIGN_MIDDLE;
+        nk_layout_row_begin(nk_ctx, NK_STATIC, row_height, cols);
+        {
+            nk_layout_row_push(nk_ctx, id_width);
+            nk_label(nk_ctx, "ID", align);
+            nk_layout_row_push(nk_ctx, name_width);
+            nk_label(nk_ctx, "COLOR", align);
+            nk_label(nk_ctx, "MATERIAL", align);
+            nk_layout_row_push(nk_ctx, density_width);
+            nk_label(nk_ctx, "DENSITY", align);
+            nk_layout_row_push(nk_ctx, other_width);
+            nk_label(nk_ctx, "KIND", align);
+            nk_label(nk_ctx, "DECAY PROBABILITY", align);
+            nk_label(nk_ctx, "IGNITION PROBABILITY", align);
+            nk_label(nk_ctx, "DECAY MATERIAL", align);
+        }
+        nk_layout_row_end(nk_ctx);
+
+        bool palette_changed = false;
+
+        for (unsigned int i = 0; i < MATERIALS_COUNT; i++) {
+            CsandMaterialProperties *props = &materials[i];
+
+            nk_layout_row_begin(nk_ctx, NK_STATIC, row_height, cols);
+
+            nk_layout_row_push(nk_ctx, id_width);
+            nk_labelf(nk_ctx, align, "%u", i);
+
+            nk_layout_row_push(nk_ctx, name_width);
+
+            CsandRgba *color = palette + i;
+            if (nk_combo_begin_color(nk_ctx, (struct nk_color){color->r, color->g, color->b, 0xFF}, nk_vec2(300, 300))) {
+                nk_layout_row_dynamic(nk_ctx, row_height, 3);
+                color->r = nk_propertyi(nk_ctx, "#R", 0x00, color->r, 0xFF, 1, 1);
+                color->g = nk_propertyi(nk_ctx, "#G", 0x00, color->g, 0xFF, 1, 1);
+                color->b = nk_propertyi(nk_ctx, "#B", 0x00, color->b, 0xFF, 1, 1);
+                color->a = 0xFF;
+                palette_changed = true;
+                nk_combo_end(nk_ctx);
+            }
+
+            const char *name = props->name;
+            if (name == NULL) {
+                name = "unnamed";
+            }
+
+            if (nk_button_label(nk_ctx, name)) {
+                draw_mat = i;
+            }
+
+            nk_layout_row_push(nk_ctx, density_width);
+            props->density = nk_propertyi(nk_ctx, "##density", 0, props->density, INT_MAX, 25, 500);
+
+            nk_layout_row_push(nk_ctx, other_width);
+            static const char *kinds[] = {
+                [MAT_KIND_SOLID] = "solid",
+                [MAT_KIND_POWDER] = "powder",
+                [MAT_KIND_FLUID] = "fluid"
+            };
+
+            props->kind = nk_combo(nk_ctx, kinds, sizeof(kinds) / sizeof(kinds[0]), props->kind, row_height, nk_vec2(other_width, row_height*(MAT_KINDS_COUNT + 1)));
+            props->decay_prob = nk_propertyi(nk_ctx, "##decay_prob", 0, props->decay_prob, UINT16_MAX, 1, 1);
+            props->ignition_prob = nk_propertyi(nk_ctx, "##ignition_prob", 0, props->ignition_prob, UINT16_MAX, 1, 1);
+            props->decay_mat = nk_propertyi(nk_ctx, "##decay_mat", 0, props->decay_mat, MATERIALS_COUNT - 1, 1, 0.5);
+
+            nk_layout_row_end(nk_ctx);
+        }
+
+        if (palette_changed) {
+            csandRendererSetPalette(palette, MATERIALS_COUNT);
+        }
+    }
+    nk_end(nk_ctx);
+}
+
 static void csandRenderCallback(double time) {
-    bool draw = csandPlatformIsMouseButtonPressed(CSAND_MOUSE_BUTTON_LEFT);
+    struct nk_context *nk_ctx = csandRendererNuklearContext();
+    nk_input_end(nk_ctx);
+
+    if (developer_menu_enabled) {
+        csandDrawDeveloperMenu();
+    }
+
+    any_nuklear_item_active = nk_item_is_any_active(nk_ctx);
+
+    bool draw = !any_nuklear_item_active && csandPlatformIsMouseButtonPressed(CSAND_MOUSE_BUTTON_LEFT);
     CsandVec2Us cur_pos = csandRendererScreenSpaceToWorldSpace(csandPlatformGetCursorPos());
 
     if (time >= next_tick_time && (!pause || input_next_frame)) {
@@ -180,6 +424,9 @@ static void csandRenderCallback(double time) {
     }
 
     csandRendererRender(data, WIDTH, HEIGHT);
+    nk_clear(nk_ctx);
+
+    nk_input_begin(nk_ctx);
 }
 
 static void csandSimulate(CsandRenderBuffer buf) {
@@ -239,7 +486,6 @@ static inline unsigned char *csandGetMat(CsandRenderBuffer buf, unsigned int x, 
     return buf.data + buf.width * y + x;
 }
 
-
 static bool csandInBounds(CsandRenderBuffer buf, int x, int y) {
     return x >= 0 && x < buf.width && y >= 0 && y < buf.height;
 }
@@ -267,6 +513,8 @@ static void tryIgnite(CsandRenderBuffer buf, unsigned int x, unsigned int y) {
                         break;
                     case MAT_KIND_FLUID:
                         mat = csandRand() & 1 ? MAT_FIRE_GAS : MAT_FIRE_LIQUID;
+                        break;
+                    case MAT_KINDS_COUNT:
                         break;
                 }
 

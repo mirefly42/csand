@@ -9,7 +9,11 @@
 typedef struct CsandPlatform {
     GLFWwindow *window;
     CsandRenderCallback render_callback;
-    CsandInputCallback input_callback;
+    CsandKeyCallback key_callback;
+    CsandCharCallback char_callback;
+    CsandMouseButtonCallback mouse_button_callback;
+    CsandMouseMotionCallback mouse_motion_callback;
+    CsandMouseScrollCallback mouse_scroll_callback;
     CsandFramebufferSizeCallback framebuffer_size_callback;
     CsandVec2I windowed_mode_pos;
     CsandVec2I windowed_mode_size;
@@ -21,7 +25,7 @@ static void csandGlfwErrorCallback(int code, const char *msg) {
     fprintf(stderr, "glfw error %d: %s\n", code, msg);
 }
 
-static void csandToggleFullscreen(void) {
+void csandPlatformToggleFullscreen(void) {
     if (glfwGetWindowMonitor(platform.window)) {
         glfwSetWindowMonitor(
             platform.window,
@@ -62,33 +66,51 @@ static void csandGlfwKeyCallback(GLFWwindow *window, int key, int scancode, int 
     (void)scancode;
     (void)mods;
 
-    if (!platform.input_callback) {
+    if (!platform.key_callback) {
         return;
     }
 
-    if (action == GLFW_PRESS) {
-        switch (key) {
-            case GLFW_KEY_SPACE:
-                platform.input_callback(CSAND_INPUT_PAUSE_TOGGLE);
-                break;
-            case GLFW_KEY_EQUAL:
-                platform.input_callback(CSAND_INPUT_SPEED_INCREASE);
-                break;
-            case GLFW_KEY_MINUS:
-                platform.input_callback(CSAND_INPUT_SPEED_DECREASE);
-                break;
-            case GLFW_KEY_PERIOD:
-                platform.input_callback(CSAND_INPUT_NEXT_FRAME);
-                break;
-            case GLFW_KEY_F:
-                csandToggleFullscreen();
-                break;
-            default:
-                if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9) {
-                    platform.input_callback(key - GLFW_KEY_0 + CSAND_INPUT_SELECT_MAT0);
-                }
-                break;
-        }
+    switch (action) {
+        case GLFW_RELEASE:
+        case GLFW_PRESS:
+            platform.key_callback(key, action, mods & (GLFW_MOD_SHIFT | GLFW_MOD_CONTROL | GLFW_MOD_ALT));
+            break;
+    }
+}
+
+static void csandGlfwCharCallback(GLFWwindow *window, unsigned int codepoint) {
+    (void)window;
+    if (platform.char_callback) {
+        platform.char_callback(codepoint);
+    }
+}
+
+static void csandGlfwMouseButtonCallback(GLFWwindow *window, int button, int action, int mods) {
+    (void)window;
+    (void)mods;
+
+    if (
+        platform.mouse_button_callback &&
+        (button == GLFW_MOUSE_BUTTON_LEFT || button == GLFW_MOUSE_BUTTON_RIGHT) &&
+        (action == GLFW_RELEASE || action == GLFW_PRESS)
+    ) {
+        platform.mouse_button_callback(button, action);
+    }
+}
+
+static void csandGlfwCursorPosCallback(GLFWwindow *window, double x, double y) {
+    (void)window;
+
+    if (platform.mouse_motion_callback) {
+        platform.mouse_motion_callback(x, y);
+    }
+}
+
+static void csandGlfwScrollCallback(GLFWwindow *window, double x, double y) {
+    (void)window;
+
+    if (platform.mouse_scroll_callback) {
+        platform.mouse_scroll_callback(x, y);
     }
 }
 
@@ -123,6 +145,10 @@ void csandPlatformInit(void) {
     glfwMakeContextCurrent(platform.window);
 
     glfwSetKeyCallback(platform.window, csandGlfwKeyCallback);
+    glfwSetCharCallback(platform.window, csandGlfwCharCallback);
+    glfwSetMouseButtonCallback(platform.window, csandGlfwMouseButtonCallback);
+    glfwSetCursorPosCallback(platform.window, csandGlfwCursorPosCallback);
+    glfwSetScrollCallback(platform.window, csandGlfwScrollCallback);
     glfwSetFramebufferSizeCallback(platform.window, csandGlfwFramebufferSizeCallback);
 }
 
@@ -130,8 +156,24 @@ void csandPlatformSetRenderCallback(CsandRenderCallback callback) {
     platform.render_callback = callback;
 }
 
-void csandPlatformSetInputCallback(CsandInputCallback callback) {
-    platform.input_callback = callback;
+void csandPlatformSetKeyCallback(CsandKeyCallback callback) {
+    platform.key_callback = callback;
+}
+
+void csandPlatformSetCharCallback(CsandCharCallback callback) {
+    platform.char_callback = callback;
+}
+
+void csandPlatformSetMouseButtonCallback(CsandMouseButtonCallback callback) {
+    platform.mouse_button_callback = callback;
+}
+
+void csandPlatformSetMouseMotionCallback(CsandMouseMotionCallback callback) {
+    platform.mouse_motion_callback = callback;
+}
+
+void csandPlatformSetMouseScrollCallback(CsandMouseScrollCallback callback) {
+    platform.mouse_scroll_callback = callback;
 }
 
 void csandPlatformSetFramebufferSizeCallback(CsandFramebufferSizeCallback callback) {
