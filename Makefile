@@ -1,6 +1,7 @@
 .POSIX:
 
-SRC = csand.c nuklear.c platform_glfw.c renderer.c
+COMMON_SRC = csand.c nuklear.c renderer.c
+SRC = ${COMMON_SRC} platform_glfw.c
 EMBED_HDR = nuklear.vert.embed.h nuklear.frag.embed.h shader.vert.embed.h shader.frag.embed.h
 HDR = math.h nuklear_config.h platform.h random.h renderer.h rgba.h vec2.h x_macros.h ${EMBED_HDR}
 OBJ = ${SRC:.c=.o}
@@ -11,8 +12,8 @@ csand: ${OBJ}
 
 all: csand csand.wasm
 
-csand.wasm: csand.c renderer.c ${HDR}
-	clang -o $@ csand.c renderer.c --target=wasm32 -nostdlib -Wl,--entry=main,--import-undefined,--export-table -Ithird_party/web/include ${CFLAGS} ${LDFLAGS}
+csand.wasm: ${COMMON_SRC} wasm_libc.c ${HDR}
+	clang -o $@ ${COMMON_SRC} wasm_libc.c --target=wasm32 -nostdlib -Wl,--entry=main,--import-undefined,--export-table -Ithird_party/include -Ithird_party/web/include ${CFLAGS} ${LDFLAGS}
 
 embed: embed.c
 	${CC} embed.c -o $@

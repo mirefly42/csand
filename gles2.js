@@ -28,8 +28,20 @@ export class GLES2Context {
     gl;
     memory;
     static #api = {
+        glBlendEquation(mode) {
+            this.gl.blendEquation(mode);
+        },
+
+        glBlendFunc(sfactor, dfactor) {
+            this.gl.blendFunc(sfactor, dfactor);
+        },
+
         glEnable(cap) {
             this.gl.enable(cap);
+        },
+
+        glDisable(cap) {
+            this.gl.disable(cap);
         },
 
         glViewport(x, y, width, height) {
@@ -66,6 +78,10 @@ export class GLES2Context {
             }
 
             this.gl.bufferData(target, this.memory.buffer.slice(data_ptr, data_ptr + size), usage);
+        },
+
+        glBufferSubData(target, offset, size, data_ptr) {
+            this.gl.bufferSubData(target, offset, this.memory.buffer.slice(data_ptr, data_ptr + size));
         },
 
         glGetAttribLocation(program_handle, name_ptr) {
@@ -165,6 +181,10 @@ export class GLES2Context {
             this.gl.drawArrays(mode, first, count);
         },
 
+        glDrawElements(mode, count, type, offset) {
+            this.gl.drawElements(mode, count, type, offset);
+        },
+
         glGenTextures(n, textures_ptr) {
             if (n < 0) {
                 return; // TODO: should generate GL_INVALID_VALUE
@@ -206,6 +226,15 @@ export class GLES2Context {
         glUniform1i(location_index, value) {
             const program = this.gl.getParameter(this.gl.CURRENT_PROGRAM);
             this.gl.uniform1i(this.#getUniformLocationByIndex(program, location_index), value);
+        },
+
+        glUniform2f(location_index, v0, v1) {
+            const program = this.gl.getParameter(this.gl.CURRENT_PROGRAM);
+            this.gl.uniform2f(this.#getUniformLocationByIndex(program, location_index), v0, v1);
+        },
+
+        glScissor(x, y, width, height) {
+            this.gl.scissor(x, y, width, height);
         },
 
         glTexImage2D(target, level, internal_format, width, height, border, format, type, pixels_ptr) {

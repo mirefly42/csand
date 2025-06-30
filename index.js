@@ -5,6 +5,11 @@ let function_table = null;
 let input_callback = null;
 let render_callback = null;
 let framebuffer_size_callback = null;
+let key_callback = null;
+let char_callback = null;
+let mouse_button_callback = null;
+let mouse_motion_callback = null;
+let mouse_scroll_callback = null;
 let canvas = null;
 let gl = null;
 let obj = null;
@@ -16,74 +21,26 @@ let scratch_buf_ptr = 0;
 const gles2_context = new GLES2Context(null, null);
 
 async function main() {
-    document.getElementById("button_toggle_buttons").addEventListener("click", () => {
-        const buttons = document.getElementById("buttons");
-        buttons.hidden = !buttons.hidden;
-    });
-
     const import_object = {
         env: {
             csandPlatformInit: csandPlatformInit,
-            csandPlatformSetInputCallback: (callback_index) => {
-                input_callback = function_table.get(callback_index);
-                function setButtonInput(id, input) {
-                    document.getElementById(id).addEventListener("click", () => {input_callback(input);});
-                }
-                document.getElementById("button_fullscreen").addEventListener("click", () => {
-                    toggleFullscreen();
-                });
-                setButtonInput("button_air", 0);
-                setButtonInput("button_wall", 1);
-                setButtonInput("button_sand", 2);
-                setButtonInput("button_water", 3);
-                setButtonInput("button_fire", 4);
-                setButtonInput("button_wood", 5);
-                setButtonInput("button_coal", 6);
-                setButtonInput("button_oil", 7);
-                setButtonInput("button_hydrogen_gas", 8);
-                setButtonInput("button_hydrogen_liquid", 9);
-                setButtonInput("button_pause", 10);
-                setButtonInput("button_simulation_speed_plus", 11);
-                setButtonInput("button_simulation_speed_minus", 12);
-                setButtonInput("button_simulate_frame", 13);
-                document.addEventListener("keydown", (event) => {
-                    const c = event.code;
-                    if (c === "Digit0") {
-                        input_callback(0);
-                    } else if (c === "Digit1") {
-                        input_callback(1);
-                    } else if (c === "Digit2") {
-                        input_callback(2);
-                    } else if (c === "Digit3") {
-                        input_callback(3);
-                    } else if (c === "Digit4") {
-                        input_callback(4);
-                    } else if (c === "Digit5") {
-                        input_callback(5);
-                    } else if (c === "Digit6") {
-                        input_callback(6);
-                    } else if (c === "Digit7") {
-                        input_callback(7);
-                    } else if (c === "Digit8") {
-                        input_callback(8);
-                    } else if (c === "Digit9") {
-                        input_callback(9);
-                    } else if (c === "Space") {
-                        event.preventDefault();
-                        input_callback(10);
-                    } else if (c === "Equal") {
-                        input_callback(11);
-                    } else if (c === "Minus") {
-                        input_callback(12);
-                    } else if (c === "Period") {
-                        input_callback(13);
-                    } else if (c === "KeyF") {
-                        toggleFullscreen();
-                    }
-                });
-            },
             csandPlatformSetRenderCallback: (callback_index) => {
                 render_callback = function_table.get(callback_index);
+            },
+            csandPlatformSetKeyCallback: (callback_index) => {
+                key_callback = function_table.get(callback_index);
+            },
+            csandPlatformSetCharCallback: (callback_index) => {
+                char_callback = function_table.get(callback_index);
+            },
+            csandPlatformSetMouseButtonCallback: (callback_index) => {
+                mouse_button_callback = function_table.get(callback_index);
+            },
+            csandPlatformSetMouseMotionCallback: (callback_index) => {
+                mouse_motion_callback = function_table.get(callback_index);
+            },
+            csandPlatformSetMouseScrollCallback: (callback_index) => {
+                mouse_scroll_callback = function_table.get(callback_index);
             },
             csandPlatformSetFramebufferSizeCallback: (callback_index) => {
                 framebuffer_size_callback = function_table.get(callback_index);
@@ -101,6 +58,9 @@ async function main() {
             csandPlatformGetFramebufferSize: csandPlatformGetWindowSize,
             csandPlatformPrintErr: (str_ptr) => {
                 console.error(getNullTerminatedString(obj.instance.exports.memory.buffer, str_ptr));
+            },
+            csandPlatformToggleFullscreen: () => {
+                toggleFullscreen();
             },
         }
     };
@@ -132,12 +92,75 @@ function csandPlatformInit() {
     gl = canvas.getContext("webgl");
     gles2_context.gl = gl;
 
+    function sendKey(event, pressed) {
+        if (key_callback === null) {
+            return;
+        }
+
+        const code = event.code;
+        const key_start = "Key";
+        const digit_start = "Digit";
+        const mods = event.shiftKey | (event.ctrlKey << 1) | (event.metaKey << 2);
+        const mapping = {
+            "Space": 32,
+            "Comma": 44,
+            "Minus": 45,
+            "Period": 46,
+            "Equal": 61,
+            "Enter": 257,
+            "Tab": 258,
+            "Backspace": 259,
+        };
+
+        function f(num_code) {
+            if (key_callback(num_code, pressed, mods)) {
+                event.preventDefault();
+            }
+        }
+
+        if (code.startsWith(key_start)) {
+            f(code.codePointAt(key_start.length));
+        } else if (code.startsWith(digit_start)) {
+            f(code.codePointAt(digit_start.length));
+        } else {
+            const num_code = mapping[code];
+            if (num_code != undefined) {
+                f(num_code);
+            }
+        }
+        // NOTE: unfinished
+    }
+
+    document.addEventListener("keydown", (event) => {
+        if (char_callback != null) {
+            if (event.key.length <= 2) { // a hacky way to check that the key isn't something like "Enter"
+                char_callback(event.key.codePointAt(0));
+            } else if (event.key === "Enter") {
+                char_callback(10);
+            }
+            // NOTE: unfinished
+        }
+
+        sendKey(event, true);
+    });
+
+    document.addEventListener("wheel", (event) => {
+        if (mouse_scroll_callback != null) {
+            mouse_scroll_callback(event.deltaX, -Math.sign(event.deltaY));
+        }
+    });
+
+    document.addEventListener("keyup", (event) => {
+        sendKey(event, false);
+    });
+
     canvas.addEventListener("pointerdown", (event) => {
         if (!mouse_down && event.button === 0) {
             canvas.setPointerCapture(event.pointerId);
             captured_pointer_id = event.pointerId;
             updateMousePosition(event.offsetX, event.offsetY);
             mouse_down = true;
+            mouse_button_callback(event.button, mouse_down);
         }
     });
 
@@ -147,6 +170,7 @@ function csandPlatformInit() {
             captured_pointer_id = null;
             updateMousePosition(event.offsetX, event.offsetY);
             mouse_down = false;
+            mouse_button_callback(event.button, mouse_down);
         }
     }
 
@@ -154,7 +178,7 @@ function csandPlatformInit() {
     canvas.addEventListener("pointerup", pointerUp);
 
     canvas.addEventListener("pointermove", (event) => {
-        if (event.pointerId === captured_pointer_id) {
+        if (captured_pointer_id === null || event.pointerId === captured_pointer_id) {
             updateMousePosition(event.offsetX, event.offsetY);
         }
     });
@@ -178,6 +202,9 @@ function updateMousePosition(x, y) {
     const uint16_max = 65535;
     mouse_x = clamp(x, 0, uint16_max);
     mouse_y = clamp(y, 0, uint16_max);
+    if (mouse_motion_callback != null) {
+        mouse_motion_callback(mouse_x, mouse_y);
+    }
 }
 
 function toggleFullscreen() {

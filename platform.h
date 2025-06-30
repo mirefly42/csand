@@ -2,6 +2,7 @@
 #define CSAND_PLATFORM_H
 
 #include "vec2.h"
+#include <stdbool.h>
 #include <stdint.h>
 
 typedef enum {
@@ -147,7 +148,8 @@ typedef enum {
 } CsandMouseButton;
 
 typedef void (*CsandRenderCallback)(double time);
-typedef void (*CsandKeyCallback)(CsandKey key, CsandAction action, CsandModSet mods);
+// should return true if event was used
+typedef bool (*CsandKeyCallback)(CsandKey key, CsandAction action, CsandModSet mods);
 typedef void (*CsandCharCallback)(uint32_t codepoint);
 typedef void (*CsandMouseButtonCallback)(CsandMouseButton button, unsigned int pressed);
 typedef void (*CsandMouseMotionCallback)(double x, double y);

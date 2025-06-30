@@ -100,7 +100,7 @@ static CsandRgba palette[MATERIALS_COUNT] = {
     [MAT_HYDROGEN_LIQUID] = {0x57, 0x8F, 0xC8, 0xFF},
 };
 
-static void csandKeyCallback(CsandKey key, CsandAction action, CsandModSet mods);
+static bool csandKeyCallback(CsandKey key, CsandAction action, CsandModSet mods);
 static void csandCharCallback(uint32_t codepoint);
 static void csandMouseButtonCallback(CsandMouseButton button, unsigned int pressed) {
     CsandVec2Us pos = csandPlatformGetCursorPos();
@@ -239,68 +239,70 @@ static void csandSendKeyStateToNuklear(CsandKey key, CsandAction action, CsandMo
     }
 }
 
-static void csandKeyCallback(CsandKey key, CsandAction action, CsandModSet mods) {
+static bool csandKeyCallback(CsandKey key, CsandAction action, CsandModSet mods) {
     csandSendKeyStateToNuklear(key, action, mods);
 
-    if (action != CSAND_ACTION_PRESS || any_nuklear_item_active) return;
+    if (action != CSAND_ACTION_PRESS || any_nuklear_item_active) return false;
 
     switch (key) {
         case CSAND_KEY_0:
             draw_mat = MAT_AIR;
-            break;
+            return true;
         case CSAND_KEY_1:
             draw_mat = MAT_WALL;
-            break;
+            return true;
         case CSAND_KEY_2:
             draw_mat = MAT_SAND;
-            break;
+            return true;
         case CSAND_KEY_3:
             draw_mat = MAT_WATER;
-            break;
+            return true;
         case CSAND_KEY_4:
             draw_mat = MAT_FIRE_GAS;
-            break;
+            return true;
         case CSAND_KEY_5:
             draw_mat = MAT_WOOD;
-            break;
+            return true;
         case CSAND_KEY_6:
             draw_mat = MAT_COAL;
-            break;
+            return true;
         case CSAND_KEY_7:
             draw_mat = MAT_OIL;
-            break;
+            return true;
         case CSAND_KEY_8:
             draw_mat = MAT_HYDROGEN_GAS;
-            break;
+            return true;
         case CSAND_KEY_9:
             draw_mat = MAT_HYDROGEN_LIQUID;
-            break;
+            return true;
         case CSAND_KEY_SPACE:
             pause = !pause;
-            break;
+            return true;
         case CSAND_KEY_EQUAL:
             if (speed < SPEED_LIMIT) {
                 speed *= 2;
             }
-            break;
+            return true;
         case CSAND_KEY_MINUS:
             if (speed > 1) {
                 speed /= 2;
             }
-            break;
+            return true;
         case CSAND_KEY_PERIOD:
             input_next_frame = true;
             pause = true;
-            break;
+            return true;
         case CSAND_KEY_F:
             csandPlatformToggleFullscreen();
-            break;
+            return true;
         case CSAND_KEY_TAB:
             developer_menu_enabled = !developer_menu_enabled;
-            break;
+            return true;
         default:
             break;
     }
+
+    return false;
 }
 
 static void csandCharCallback(uint32_t codepoint) {

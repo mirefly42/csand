@@ -11,43 +11,14 @@
     position: relative;
     touch-action: pinch-zoom;
 }
-
-#buttons {
-    position: absolute;
-    opacity: 0.5;
-
-    button {
-        min-width: 40px;
-        min-height: 30px;
-    }
-}
 </style>
 </head>
 
 <body>
 <div id="game">
-    <div id=buttons>
-        <button id="button_fullscreen">Fullscreen</button>
-        <button id="button_air">Air</button>
-        <button id="button_wall">Wall</button>
-        <button id="button_sand">Sand</button>
-        <button id="button_water">Water</button>
-        <button id="button_fire">Fire</button>
-        <button id="button_wood">Wood</button>
-        <button id="button_coal">Coal</button>
-        <button id="button_oil">Oil</button>
-        <button id="button_hydrogen_gas">Hydrogen gas</button>
-        <button id="button_hydrogen_liquid">Hydrogen liquid</button>
-        <button id="button_pause">Pause</button>
-        <button id="button_simulation_speed_plus">Simulation speed +</button>
-        <button id="button_simulation_speed_minus">Simulation speed -</button>
-        <button id="button_simulate_frame">Simulate frame</button>
-    </div>
     <canvas id="canvas" width=1024, height=512></canvas>
 </div>
 <pre>
-<button id="button_toggle_buttons">Toggle buttons</button>
-
 Controls:
 1     - Wall
 2     - Sand
@@ -65,6 +36,7 @@ Minus - Decrease simulation speed
 Plus  - Increase simulation speed
 &gt;     - Simulate a single frame (speed dependent)
 F     - Toggle fullscreen
+Tab   - Toggle super secret menu (don't tell anybody)
 </pre>
 <script src="index.js" type="module"></script>
 </body>

@@ -1,3 +1,4 @@
+#include "font8x8_basic.h"
 #include "math.h"
 #include "nuklear_config.h"
 #include "platform.h"
@@ -5,9 +6,21 @@
 #include "vec2.h"
 #include <GLES2/gl2.h>
 #include <stddef.h>
-#include <stdlib.h>
+
+#define FONT_GLYPH_WIDTH 8
+#define FONT_GLYPH_HEIGHT 8
+#define FONT_GLYPHS_COUNT 128
+#define FONT_ATLAS_WIDTH FONT_GLYPH_WIDTH
+#define FONT_ATLAS_HEIGHT (FONT_GLYPH_HEIGHT * FONT_GLYPHS_COUNT)
+
+typedef struct CsandNuklearVertex {
+    float pos[2];
+    float uv[2];
+    unsigned char color[4];
+} CsandNuklearVertex;
 
 typedef struct CsandRenderer {
+    struct nk_user_font nk_font;
     CsandVec2Us world_size;
     CsandVec2Us framebuffer_size;
     CsandVec2Us viewport_offset;
@@ -17,18 +30,15 @@ typedef struct CsandRenderer {
     GLuint nuklear_vbo;
     GLuint nuklear_program;
     struct nk_context nk_ctx;
-    struct nk_font_atlas nk_font_atlas;
     struct nk_convert_config nk_convert_config;
+    struct nk_draw_command nuklear_ctx_buffer_data[8 * 1024];
+    struct nk_draw_command nuklear_command_buffer_data[1024];
+    CsandNuklearVertex nuklear_vertex_buffer_data[64 * 1024];
+    nk_draw_index nuklear_element_buffer_data[256 * 1024];
     struct nk_buffer cmds, vertices, elements;
 } CsandRenderer;
 
-typedef struct CsandNuklearVertex {
-    float pos[2];
-    float uv[2];
-    unsigned char color[4];
-} CsandNuklearVertex;
-
-CsandRenderer csand_renderer;
+CsandRenderer csand_renderer = {0};
 static const char vertex_shader_src[] = {
 #include "shader.vert.embed.h"
     '\0'
@@ -66,15 +76,32 @@ static void csandUpdateWorldSize(CsandVec2Us world_size);
 #define CSAND_PALETTE_TEXTURE GL_TEXTURE1
 #define CSAND_FONT_TEXTURE GL_TEXTURE2
 
-#define CSAND_NUKLEAR_VERTEX_BUFFER_CAPACITY (512 * 1024 * 4)
-#define CSAND_NUKLEAR_ELEMENT_BUFFER_CAPACITY (128 * 1024 * 4)
+static float csandNuklearTextWidth(nk_handle handle, float h, const char *text, int length) {
+    (void)handle; (void)h; (void)text;
+
+    return length * FONT_GLYPH_WIDTH;
+}
+
+static void csandNuklearQueryFontGlyph(nk_handle handle, float font_height, struct nk_user_font_glyph *glyph, nk_rune codepoint, nk_rune next_codepoint) {
+    (void)handle; (void)font_height; (void)next_codepoint;
+
+    glyph->width = FONT_GLYPH_WIDTH;
+    glyph->height = FONT_GLYPH_HEIGHT;
+    glyph->xadvance = FONT_GLYPH_WIDTH;
+    glyph->offset = nk_vec2(0, 0);
+    glyph->uv[0] = nk_vec2(0, codepoint * FONT_GLYPH_HEIGHT / (float)FONT_ATLAS_HEIGHT);
+    glyph->uv[1] = nk_vec2(1, glyph->uv[0].y + FONT_GLYPH_HEIGHT / (float)FONT_ATLAS_HEIGHT);
+}
 
 static void csandNuklearInit(void) {
-    nk_font_atlas_init_default(&csand_renderer.nk_font_atlas);
-    nk_font_atlas_begin(&csand_renderer.nk_font_atlas);
-
-    int w, h;
-    const void *pixels = nk_font_atlas_bake(&csand_renderer.nk_font_atlas, &w, &h, NK_FONT_ATLAS_ALPHA8);
+    unsigned char font_atlas[FONT_ATLAS_HEIGHT][FONT_ATLAS_WIDTH];
+    for (int y = 0; y < FONT_ATLAS_HEIGHT; y++) {
+        for (int x = 0; x < FONT_ATLAS_WIDTH; x++) {
+            font_atlas[y][x] = font8x8_basic[y / FONT_GLYPH_HEIGHT][y % FONT_GLYPH_HEIGHT] & (1 << x) ? 0xFF : 0x00;
+        }
+    }
+    font_atlas[0][0] = 0xFF; // white pixel
+    struct nk_draw_null_texture null_texture = {nk_handle_id(CSAND_FONT_TEXTURE), nk_vec2(0, 0)};
 
     GLuint font_texture;
     glGenTextures(1, &font_texture);
@@ -86,13 +113,18 @@ static void csandNuklearInit(void) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, w, h, 0, GL_ALPHA, GL_UNSIGNED_BYTE, pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, FONT_ATLAS_WIDTH, FONT_ATLAS_HEIGHT, 0, GL_ALPHA, GL_UNSIGNED_BYTE, font_atlas);
 
-    struct nk_draw_null_texture null_texture;
-    nk_font_atlas_end(&csand_renderer.nk_font_atlas, nk_handle_id(CSAND_FONT_TEXTURE), &null_texture);
-    nk_font_atlas_cleanup(&csand_renderer.nk_font_atlas);
+    csand_renderer.nk_font.height = FONT_GLYPH_HEIGHT;
+    csand_renderer.nk_font.width = csandNuklearTextWidth;
+    csand_renderer.nk_font.query = csandNuklearQueryFontGlyph;
 
-    if (!nk_init_default(&csand_renderer.nk_ctx, &csand_renderer.nk_font_atlas.default_font->handle)) {
+    if (!nk_init_fixed(
+            &csand_renderer.nk_ctx,
+            csand_renderer.nuklear_ctx_buffer_data,
+            sizeof(csand_renderer.nuklear_ctx_buffer_data),
+            &csand_renderer.nk_font
+    )) {
         csandPlatformPrintErr("failed to initialize nuklear context\n");
     }
 
@@ -121,14 +153,14 @@ static void csandNuklearInit(void) {
     glGenBuffers(1, &ebo);
 
     glBindBuffer(GL_ARRAY_BUFFER, csand_renderer.nuklear_vbo);
-    glBufferData(GL_ARRAY_BUFFER, CSAND_NUKLEAR_VERTEX_BUFFER_CAPACITY, NULL, GL_STREAM_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(csand_renderer.nuklear_vertex_buffer_data), NULL, GL_STREAM_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, CSAND_NUKLEAR_ELEMENT_BUFFER_CAPACITY, NULL, GL_STREAM_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(csand_renderer.nuklear_element_buffer_data), NULL, GL_STREAM_DRAW);
 
-    nk_buffer_init_default(&csand_renderer.cmds);
-    nk_buffer_init_default(&csand_renderer.vertices);
-    nk_buffer_init_default(&csand_renderer.elements);
+    nk_buffer_init_fixed(&csand_renderer.cmds, csand_renderer.nuklear_command_buffer_data, sizeof(csand_renderer.nuklear_command_buffer_data));
+    nk_buffer_init_fixed(&csand_renderer.vertices, csand_renderer.nuklear_vertex_buffer_data, sizeof(csand_renderer.nuklear_vertex_buffer_data));
+    nk_buffer_init_fixed(&csand_renderer.elements, csand_renderer.nuklear_element_buffer_data, sizeof(csand_renderer.nuklear_element_buffer_data));
 
     csand_renderer.nuklear_program = csandLoadShaderProgram(
         "nuklear",
@@ -141,8 +173,6 @@ static void csandNuklearInit(void) {
 }
 
 void csandRendererInit(CsandVec2Us world_size, CsandVec2Us framebuffer_size, const CsandRgba *colors, uint8_t colors_count) {
-    csand_renderer = (CsandRenderer){0};
-
     glGenBuffers(1, &csand_renderer.world_vbo);
     glBindBuffer(GL_ARRAY_BUFFER, csand_renderer.world_vbo);
     GLbyte vbo_data[3*2] = {
@@ -208,8 +238,8 @@ static void csandRendererRenderNuklear(void) {
     );
 
     glBindBuffer(GL_ARRAY_BUFFER, csand_renderer.nuklear_vbo);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, csandUlMin(csand_renderer.vertices.size, CSAND_NUKLEAR_VERTEX_BUFFER_CAPACITY), nk_buffer_memory_const(&csand_renderer.vertices));
-    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, csandUlMin(csand_renderer.elements.size, CSAND_NUKLEAR_ELEMENT_BUFFER_CAPACITY), nk_buffer_memory_const(&csand_renderer.elements));
+    glBufferSubData(GL_ARRAY_BUFFER, 0, csand_renderer.vertices.size, nk_buffer_memory_const(&csand_renderer.vertices));
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, csand_renderer.elements.size, nk_buffer_memory_const(&csand_renderer.elements));
 
     GLint position_attr_loc = glGetAttribLocation(csand_renderer.nuklear_program, "position");
     glVertexAttribPointer(position_attr_loc, 2, GL_FLOAT, GL_FALSE, sizeof(CsandNuklearVertex), (void *)offsetof(CsandNuklearVertex, pos));
