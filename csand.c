@@ -43,6 +43,8 @@ static bool input_next_frame = false;
 static bool any_nuklear_item_active = false;
 static bool developer_menu_enabled = false;
 static struct nk_rect developer_menu_bounds = {10, 10, 730, 540};
+static float buttons_row_width = 0;
+static bool buttons_shown = true;
 
 typedef struct CsandRenderBuffer {
     unsigned char *data;
@@ -100,6 +102,21 @@ static CsandRgba palette[MATERIALS_COUNT] = {
     [MAT_HYDROGEN_LIQUID] = {0x57, 0x8F, 0xC8, 0xFF},
 };
 
+static const unsigned char selectable_materials[] = {
+    MAT_AIR,
+    MAT_WALL,
+    MAT_SAND,
+    MAT_WATER,
+    MAT_FIRE_GAS,
+    MAT_WOOD,
+    MAT_COAL,
+    MAT_OIL,
+    MAT_HYDROGEN_GAS,
+    MAT_HYDROGEN_LIQUID,
+};
+
+#define CSAND_STATIC_ARRAY_LENGTH(array) (sizeof(array) / sizeof((array)[0]))
+
 static bool csandKeyCallback(CsandKey key, CsandAction action, CsandModSet mods);
 static void csandCharCallback(uint32_t codepoint);
 static void csandMouseButtonCallback(CsandMouseButton button, unsigned int pressed) {
@@ -129,6 +146,23 @@ static inline unsigned char *csandGetMat(CsandRenderBuffer buf, unsigned int x, 
 static bool csandInBounds(CsandRenderBuffer buf, int x, int y);
 static inline bool csandMatIsFire(unsigned char mat);
 static void tryIgnite(CsandRenderBuffer buf, unsigned int x, unsigned int y);
+
+static void csandDoubleSimulationSpeed(void) {
+    if (speed < SPEED_LIMIT) {
+        speed *= 2;
+    }
+}
+
+static void csandHalveSimulationSpeed(void) {
+    if (speed > 1) {
+        speed /= 2;
+    }
+}
+
+static void csandSimulateSingleFrame(void) {
+    input_next_frame = true;
+    pause = true;
+}
 
 int main(void) {
     csandPlatformInit();
@@ -279,18 +313,13 @@ static bool csandKeyCallback(CsandKey key, CsandAction action, CsandModSet mods)
             pause = !pause;
             return true;
         case CSAND_KEY_EQUAL:
-            if (speed < SPEED_LIMIT) {
-                speed *= 2;
-            }
+            csandDoubleSimulationSpeed();
             return true;
         case CSAND_KEY_MINUS:
-            if (speed > 1) {
-                speed /= 2;
-            }
+            csandHalveSimulationSpeed();
             return true;
         case CSAND_KEY_PERIOD:
-            input_next_frame = true;
-            pause = true;
+            csandSimulateSingleFrame();
             return true;
         case CSAND_KEY_F:
             csandPlatformToggleFullscreen();
@@ -399,9 +428,70 @@ static void csandDrawDeveloperMenu(void) {
     nk_end(nk_ctx);
 }
 
+static bool csandRowTemplateAutoSizedButton(struct nk_context *nk_ctx, const char *text) {
+    const struct nk_user_font *font = nk_ctx->style.font;
+    float width = font->width(font->userdata, font->height, text, nk_strlen(text)) + 18;
+    nk_layout_row_template_push_static(nk_ctx, width);
+    return nk_button_label(nk_ctx, text);
+}
+
+static void csandDrawButtons(void) {
+    struct nk_context *nk_ctx = csandRendererNuklearContext();
+
+    float row_height = 40;
+    nk_style_push_style_item(nk_ctx, &nk_ctx->style.window.fixed_background, nk_style_item_color(nk_rgba(0, 0, 0, 0)));
+    if (nk_begin(nk_ctx, "Buttons", nk_rect(0, 0, csandFMin(buttons_row_width, csandPlatformGetFramebufferSize().x) + 14, row_height + 18), NK_WINDOW_BACKGROUND)) {
+        nk_layout_row_template_begin(nk_ctx, row_height);
+
+        if (csandRowTemplateAutoSizedButton(nk_ctx, buttons_shown ? "<" : ">")) {
+            buttons_shown = !buttons_shown;
+        }
+
+        if (buttons_shown) {
+            for (size_t i = 0; i < CSAND_STATIC_ARRAY_LENGTH(selectable_materials); i++) {
+                unsigned char mat = selectable_materials[i];
+                if (csandRowTemplateAutoSizedButton(nk_ctx, materials[mat].name)) {
+                    draw_mat = mat;
+                }
+            }
+
+            if (csandRowTemplateAutoSizedButton(nk_ctx, "fullscreen")) {
+                csandPlatformToggleFullscreen();
+            }
+
+            if (csandRowTemplateAutoSizedButton(nk_ctx, "pause")) {
+                pause = !pause;
+            }
+
+            if (csandRowTemplateAutoSizedButton(nk_ctx, "speed+")) {
+                csandDoubleSimulationSpeed();
+            }
+
+            if (csandRowTemplateAutoSizedButton(nk_ctx, "speed-")) {
+                csandHalveSimulationSpeed();
+            }
+
+            if (csandRowTemplateAutoSizedButton(nk_ctx, "next frame")) {
+                csandSimulateSingleFrame();
+            }
+
+            if (csandRowTemplateAutoSizedButton(nk_ctx, "dev menu")) {
+                developer_menu_enabled = !developer_menu_enabled;
+            }
+        }
+        struct nk_panel *panel = nk_window_get_panel(nk_ctx);
+        buttons_row_width = panel->max_x;
+        nk_layout_row_template_end(nk_ctx);
+    }
+    nk_end(nk_ctx);
+    nk_style_pop_style_item(nk_ctx);
+}
+
 static void csandRenderCallback(double time) {
     struct nk_context *nk_ctx = csandRendererNuklearContext();
     nk_input_end(nk_ctx);
+
+    csandDrawButtons();
 
     if (developer_menu_enabled) {
         csandDrawDeveloperMenu();

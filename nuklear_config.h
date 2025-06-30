@@ -4,6 +4,7 @@
 #define NK_ASSERT(x)
 #define NK_INCLUDE_STANDARD_VARARGS
 #define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
+#define NK_MAX_LAYOUT_ROW_TEMPLATE_COLUMNS 32
 #include "nuklear.h"
 
 #endif
