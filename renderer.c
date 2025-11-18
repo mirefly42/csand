@@ -13,6 +13,8 @@
 #define FONT_ATLAS_WIDTH FONT_GLYPH_WIDTH
 #define FONT_ATLAS_HEIGHT (FONT_GLYPH_HEIGHT * FONT_GLYPHS_COUNT)
 
+#define CSAND_GLOW_RESOLUTION_FACTOR 2
+
 typedef struct CsandNuklearVertex {
     float pos[2];
     float uv[2];
@@ -25,8 +27,11 @@ typedef struct CsandRenderer {
     CsandVec2Us framebuffer_size;
     CsandVec2Us viewport_offset;
     CsandVec2Us viewport_size;
+    bool glow_enabled;
     GLuint world_vbo;
     GLuint world_program;
+    GLuint glow_fbo;
+    GLuint glow_program;
     GLuint nuklear_vbo;
     GLuint nuklear_program;
     struct nk_context nk_ctx;
@@ -63,6 +68,12 @@ static const char csand_nuklear_frag_src[] = {
 };
 #define CSAND_NUKLEAR_FRAG_SRC_LENGTH (sizeof(csand_nuklear_frag_src) - 1)
 
+static const char csand_glow_frag_src[] = {
+#include "glow.frag.embed.h"
+    '\0'
+};
+#define CSAND_GLOW_FRAG_SRC_LENGTH (sizeof(csand_glow_frag_src) - 1)
+
 static GLuint csandLoadShaderProgram(
     const char *program_name,
     const char *vertex_shader_name, const char *vertex_shader_src, size_t vertex_shader_length,
@@ -76,6 +87,7 @@ typedef enum {
     CSAND_TEXTURE_UNIT_RENDER,
     CSAND_TEXTURE_UNIT_PALETTE,
     CSAND_TEXTURE_UNIT_FONT,
+    CSAND_TEXTURE_UNIT_GLOW,
 } CsandTextureUnit;
 
 static float csandNuklearTextWidth(nk_handle handle, float h, const char *text, int length) {
@@ -178,6 +190,38 @@ static void csandNuklearInit(void) {
     glUniform1i(glGetUniformLocation(csand_renderer.nuklear_program, "texture"), CSAND_TEXTURE_UNIT_FONT);
 }
 
+static void setupTexture(GLint interpolation) {
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, interpolation);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, interpolation);
+}
+
+static void glowInit(void) {
+    glGenFramebuffers(1, &csand_renderer.glow_fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, csand_renderer.glow_fbo);
+
+    GLuint glow_texture;
+    glGenTextures(1, &glow_texture);
+    setActiveTextureUnit(CSAND_TEXTURE_UNIT_GLOW);
+    glBindTexture(GL_TEXTURE_2D, glow_texture);
+    setupTexture(GL_LINEAR);
+
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, glow_texture, 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    csand_renderer.glow_program = csandLoadShaderProgram(
+        "glow",
+        "shader.vert", vertex_shader_src, VERTEX_SHADER_SRC_LENGTH,
+        "glow.frag", csand_glow_frag_src, CSAND_GLOW_FRAG_SRC_LENGTH
+    );
+
+    glUseProgram(csand_renderer.glow_program);
+    glUniform1i(glGetUniformLocation(csand_renderer.glow_program, "texture"), CSAND_TEXTURE_UNIT_RENDER);
+    glUniform1i(glGetUniformLocation(csand_renderer.glow_program, "palette"), CSAND_TEXTURE_UNIT_PALETTE);
+}
+
 void csandRendererInit(CsandVec2Us world_size, CsandVec2Us framebuffer_size, const CsandRgba *colors, uint8_t colors_count) {
     glGenBuffers(1, &csand_renderer.world_vbo);
     glBindBuffer(GL_ARRAY_BUFFER, csand_renderer.world_vbo);
@@ -200,24 +244,20 @@ void csandRendererInit(CsandVec2Us world_size, CsandVec2Us framebuffer_size, con
 
     setActiveTextureUnit(CSAND_TEXTURE_UNIT_RENDER);
     glBindTexture(GL_TEXTURE_2D, render_texture);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    setupTexture(GL_NEAREST);
 
     glUniform1i(glGetUniformLocation(csand_renderer.world_program, "texture"), CSAND_TEXTURE_UNIT_RENDER);
+    glUniform1i(glGetUniformLocation(csand_renderer.world_program, "palette"), CSAND_TEXTURE_UNIT_PALETTE);
+    glUniform1i(glGetUniformLocation(csand_renderer.world_program, "glow"), CSAND_TEXTURE_UNIT_GLOW);
+
+    glowInit();
 
     GLuint palette_texture;
     glGenTextures(1, &palette_texture);
 
     setActiveTextureUnit(CSAND_TEXTURE_UNIT_PALETTE);
     glBindTexture(GL_TEXTURE_2D, palette_texture);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    setupTexture(GL_NEAREST);
 
     csandRendererSetPalette(colors, colors_count);
 
@@ -229,9 +269,12 @@ void csandRendererInit(CsandVec2Us world_size, CsandVec2Us framebuffer_size, con
 void csandRendererSetPalette(const CsandRgba *colors, uint8_t colors_count) {
     setActiveTextureUnit(CSAND_TEXTURE_UNIT_PALETTE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, colors_count, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, colors);
+
     glUseProgram(csand_renderer.world_program);
-    glUniform1i(glGetUniformLocation(csand_renderer.world_program, "palette"), CSAND_TEXTURE_UNIT_PALETTE);
     glUniform1i(glGetUniformLocation(csand_renderer.world_program, "palette_size"), colors_count);
+
+    glUseProgram(csand_renderer.glow_program);
+    glUniform1i(glGetUniformLocation(csand_renderer.glow_program, "palette_size"), colors_count);
 }
 
 static void csandRendererRenderNuklear(void) {
@@ -290,23 +333,42 @@ static void csandRendererRenderNuklear(void) {
     nk_buffer_clear(&csand_renderer.cmds);
 }
 
-void csandRendererRender(unsigned char *data, unsigned short width, unsigned short height) {
-    glClearColor(0.06, 0.12, 0.17, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT);
+static void drawFullscreenQuad(GLuint program) {
+    glBindBuffer(GL_ARRAY_BUFFER, csand_renderer.world_vbo);
+    GLint position_attr_loc = glGetAttribLocation(program, "position");
+    glVertexAttribPointer(position_attr_loc, 2, GL_BYTE, GL_FALSE, 0, NULL);
+    glEnableVertexAttribArray(position_attr_loc);
 
+    glUseProgram(program);
+
+    glEnable(GL_CULL_FACE);
+
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    glDisable(GL_CULL_FACE);
+}
+
+void csandRendererRender(unsigned char *data, unsigned short width, unsigned short height) {
     if (width != csand_renderer.world_size.x || height != csand_renderer.world_size.y) {
         csandUpdateWorldSize((CsandVec2Us){width, height});
     }
 
-    glBindBuffer(GL_ARRAY_BUFFER, csand_renderer.world_vbo);
-    GLint position_attr_loc = glGetAttribLocation(csand_renderer.world_program, "position");
-    glVertexAttribPointer(position_attr_loc, 2, GL_BYTE, GL_FALSE, 0, NULL);
-    glEnableVertexAttribArray(position_attr_loc);
+    glBindFramebuffer(GL_FRAMEBUFFER, csand_renderer.glow_fbo);
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    if (csand_renderer.glow_enabled) {
+        glViewport(0, 0, width * CSAND_GLOW_RESOLUTION_FACTOR, height * CSAND_GLOW_RESOLUTION_FACTOR);
+        drawFullscreenQuad(csand_renderer.glow_program);
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glClearColor(0.06, 0.12, 0.17, 1.0);
+    glClear(GL_COLOR_BUFFER_BIT);
 
     setActiveTextureUnit(CSAND_TEXTURE_UNIT_RENDER);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_LUMINANCE, GL_UNSIGNED_BYTE, data);
-
-    glUseProgram(csand_renderer.world_program);
 
     glViewport(
         csand_renderer.viewport_offset.x,
@@ -315,11 +377,7 @@ void csandRendererRender(unsigned char *data, unsigned short width, unsigned sho
         csand_renderer.viewport_size.y
     );
 
-    glEnable(GL_CULL_FACE);
-
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-
-    glDisable(GL_CULL_FACE);
+    drawFullscreenQuad(csand_renderer.world_program);
 
     csandRendererRenderNuklear();
 }
@@ -339,6 +397,14 @@ void csandRendererUpdateViewport(CsandVec2Us framebuffer_size) {
         csandVec2UsDivScalar(framebuffer_size, 2),
         csandVec2UsDivScalar(csand_renderer.viewport_size, 2)
     );
+}
+
+bool csandRendererGetGlow(void) {
+    return csand_renderer.glow_enabled;
+}
+
+void csandRendererSetGlow(bool enabled) {
+    csand_renderer.glow_enabled = enabled;
 }
 
 CsandVec2Us csandRendererScreenSpaceToWorldSpace(CsandVec2Us vec) {
@@ -428,8 +494,13 @@ static GLuint csandLoadShader(const char *name, const char *src, size_t size, GL
 }
 
 static void csandUpdateWorldSize(CsandVec2Us world_size) {
-    setActiveTextureUnit(CSAND_TEXTURE_UNIT_RENDER);
-
     csand_renderer.world_size = world_size;
+
+    setActiveTextureUnit(CSAND_TEXTURE_UNIT_RENDER);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, world_size.x, world_size.y, 0, GL_LUMINANCE, GL_UNSIGNED_BYTE, NULL);
+
+    setActiveTextureUnit(CSAND_TEXTURE_UNIT_GLOW);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, world_size.x * CSAND_GLOW_RESOLUTION_FACTOR, world_size.y * CSAND_GLOW_RESOLUTION_FACTOR, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glUseProgram(csand_renderer.glow_program);
+    glUniform2i(glGetUniformLocation(csand_renderer.glow_program, "world_size"), world_size.x, world_size.y);
 }

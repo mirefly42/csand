@@ -87,7 +87,7 @@ static CsandMaterialProperties materials[MATERIALS_COUNT] = {
 };
 
 static CsandRgba palette[MATERIALS_COUNT] = {
-    [MAT_AIR]             = {0x00, 0x00, 0x00, 0xFF},
+    [MAT_AIR]             = {0x00, 0x00, 0x00, 0x87},
     [MAT_WALL]            = {0xFF, 0x00, 0xFF, 0xFF},
     [MAT_SAND]            = {0xFF, 0xFF, 0x00, 0xFF},
     [MAT_WATER]           = {0x00, 0x00, 0xFF, 0xFF},
@@ -167,6 +167,7 @@ static void csandSimulateSingleFrame(void) {
 int main(void) {
     csandPlatformInit();
     csandRendererInit((CsandVec2Us){WIDTH, HEIGHT}, csandPlatformGetFramebufferSize(), palette, MATERIALS_COUNT);
+    csandRendererSetGlow(true);
     csandPlatformSetKeyCallback(csandKeyCallback);
     csandPlatformSetCharCallback(csandCharCallback);
     csandPlatformSetMouseButtonCallback(csandMouseButtonCallback);
@@ -312,6 +313,9 @@ static bool csandKeyCallback(CsandKey key, CsandAction action, CsandModSet mods)
         case CSAND_KEY_SPACE:
             pause = !pause;
             return true;
+        case CSAND_KEY_G:
+            csandRendererSetGlow(!csandRendererGetGlow());
+            return true;
         case CSAND_KEY_EQUAL:
             csandDoubleSimulationSpeed();
             return true;
@@ -385,11 +389,11 @@ static void csandDrawDeveloperMenu(void) {
 
             CsandRgba *color = palette + i;
             if (nk_combo_begin_color(nk_ctx, (struct nk_color){color->r, color->g, color->b, 0xFF}, nk_vec2(300, 300))) {
-                nk_layout_row_dynamic(nk_ctx, row_height, 3);
+                nk_layout_row_dynamic(nk_ctx, row_height, 4);
                 color->r = nk_propertyi(nk_ctx, "#R", 0x00, color->r, 0xFF, 1, 1);
                 color->g = nk_propertyi(nk_ctx, "#G", 0x00, color->g, 0xFF, 1, 1);
                 color->b = nk_propertyi(nk_ctx, "#B", 0x00, color->b, 0xFF, 1, 1);
-                color->a = 0xFF;
+                color->a = nk_propertyi(nk_ctx, "#A", 0x00, color->a, 0xFF, 1, 1);
                 palette_changed = true;
                 nk_combo_end(nk_ctx);
             }

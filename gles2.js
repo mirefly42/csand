@@ -228,6 +228,11 @@ export class GLES2Context {
             this.gl.uniform1i(this.#getUniformLocationByIndex(program, location_index), value);
         },
 
+        glUniform2i(location_index, v0, v1) {
+            const program = this.gl.getParameter(this.gl.CURRENT_PROGRAM);
+            this.gl.uniform2i(this.#getUniformLocationByIndex(program, location_index), v0, v1);
+        },
+
         glUniform2f(location_index, v0, v1) {
             const program = this.gl.getParameter(this.gl.CURRENT_PROGRAM);
             this.gl.uniform2f(this.#getUniformLocationByIndex(program, location_index), v0, v1);
@@ -246,12 +251,33 @@ export class GLES2Context {
             let pixels = this.#pixelsFromMemory(width, height, format, type, pixels_ptr);
             this.gl.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type, pixels);
         },
+
+        glGenFramebuffers(n, framebuffers_ptr) {
+            if (n < 0) {
+                return; // TODO: should generate GL_INVALID_VALUE
+            }
+            const framebuffers = new Uint32LeArray(this.memory.buffer, framebuffers_ptr, n);
+            for (let i = 0; i < n; i++) {
+                const handle = this.#framebuffers.allocHandle(this.gl.createFramebuffer());
+                framebuffers.set(i, handle);
+            }
+        },
+
+
+        glBindFramebuffer(target, buffer_handle) {
+            this.gl.bindFramebuffer(target, this.#framebuffers.derefHandle(buffer_handle));
+        },
+
+        glFramebufferTexture2D(target, attachment, textarget, texture_handle, level) {
+            this.gl.framebufferTexture2D(target, attachment, textarget, this.#textures.derefHandle(texture_handle), level);
+        },
     };
 
     #buffers = new HandlePool();
     #shaders = new HandlePool();
     #programs = new HandlePool();
     #textures = new HandlePool();
+    #framebuffers = new HandlePool();
 
     constructor(gl, memory) {
         this.gl = gl;

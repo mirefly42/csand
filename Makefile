@@ -2,7 +2,7 @@
 
 COMMON_SRC = csand.c nuklear.c renderer.c
 SRC = ${COMMON_SRC} platform_glfw.c
-EMBED_HDR = nuklear.vert.embed.h nuklear.frag.embed.h shader.vert.embed.h shader.frag.embed.h
+EMBED_HDR = glow.frag.embed.h nuklear.vert.embed.h nuklear.frag.embed.h shader.vert.embed.h shader.frag.embed.h
 HDR = math.h nuklear_config.h platform.h random.h renderer.h rgba.h vec2.h x_macros.h ${EMBED_HDR}
 OBJ = ${SRC:.c=.o}
 LIBS = -lglfw -lGLESv2 -lm
@@ -17,6 +17,9 @@ csand.wasm: ${COMMON_SRC} wasm_libc.c ${HDR}
 
 embed: embed.c
 	${CC} embed.c -o $@
+
+glow.frag.embed.h: embed glow.frag
+	./embed < glow.frag > $@
 
 shader.vert.embed.h: embed shader.vert
 	./embed < shader.vert > $@
